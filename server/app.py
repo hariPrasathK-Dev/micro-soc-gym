@@ -464,20 +464,15 @@ app = gr.mount_gradio_app(app, gradio_ui, path="/")
 # Dev server entry point
 # ---------------------------------------------------------------------------
 
-def main(host: str = "0.0.0.0", port: int = 7860):
+def main():
     """
     Run the server directly:
         uvicorn server.app:app --host 0.0.0.0 --port 7860
         python -m server.app
     """
     import uvicorn
-    uvicorn.run(app, host=host, port=port)
+    uvicorn.run(app, host="0.0.0.0", port=7860)
 
 
 if __name__ == "__main__":
-    import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--port", type=int, default=7860)
-    parser.add_argument("--host", type=str, default="0.0.0.0")
-    args = parser.parse_args()
-    main(host=args.host, port=args.port)
+    main()
