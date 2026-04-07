@@ -182,16 +182,11 @@ def run_medium(client: MicroSocGymClient) -> float:
     # The subsequent step() action will read the newly populated logs.
     _print_obs(obs)
 
-    # Demo false positive first, then the correct action
-    print("  → Sending: block_ip(10.0.0.100)  [intentional false positive demo]")
-    obs1 = client.step(tool="block_ip", ip_address="10.0.0.100")
-    _print_obs(obs1)
-
     print("  → Sending: block_ip(10.0.0.2)  [correct attacker]")
-    obs2 = client.step(tool="block_ip", ip_address="10.0.0.2")
-    _print_obs(obs2)
+    obs = client.step(tool="block_ip", ip_address="10.0.0.2")
+    _print_obs(obs)
 
-    total = obs1.get("reward", 0.0) + obs2.get("reward", 0.0)
+    total = obs.get("reward", 0.0)
     print(f"  Episode total reward: {total:+.1f}")
     return total
 
