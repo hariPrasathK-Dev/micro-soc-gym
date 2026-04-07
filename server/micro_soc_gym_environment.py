@@ -36,13 +36,13 @@ MEDIUM_WHITELIST = {"10.0.0.100"}   # legitimate admin - blocking this is a fals
 _IS_LINUX = sys.platform.startswith("linux")
 
 # Reward values
-REWARD_CORRECT_BLOCK = 10.0
-REWARD_FALSE_POSITIVE = -10.0
-REWARD_KILL_PID = 5.0
-REWARD_DELETE_FILE = 5.0
-REWARD_STEP_PENALTY = -1.0          # small cost per step to encourage speed
-REWARD_WRONG_TOOL = -2.0
-MAX_STEPS = 20
+REWARD_CORRECT_BLOCK = 1.0
+REWARD_FALSE_POSITIVE = 0.0
+REWARD_KILL_PID = 0.5
+REWARD_DELETE_FILE = 0.5
+REWARD_STEP_PENALTY = 0.0          # No generic step penalty (must be >= 0)
+REWARD_WRONG_TOOL = 0.0
+MAX_STEPS = 8
 
 
 class MicroSocGymEnvironment(Environment):
@@ -184,7 +184,7 @@ class MicroSocGymEnvironment(Environment):
             return REWARD_CORRECT_BLOCK, True, True, f"Correct! Blocked attacker {ip}. Threat neutralised."
 
         if ip in MEDIUM_WHITELIST:
-            return REWARD_FALSE_POSITIVE, False, False, f"False positive: {ip} is a legitimate host."
+            return REWARD_FALSE_POSITIVE, True, False, f"False positive: {ip} is a legitimate host. Episode failed."
 
         return REWARD_WRONG_TOOL, False, False, f"Blocked {ip} but that is not the attacker. Check the logs."
 
@@ -198,8 +198,8 @@ class MicroSocGymEnvironment(Environment):
         ip = (action.ip_address or "").strip()
 
         if ip in MEDIUM_WHITELIST:
-            return REWARD_FALSE_POSITIVE, False, False, (
-                f"False positive! {ip} is a whitelisted admin IP. Do NOT block it."
+            return REWARD_FALSE_POSITIVE, True, False, (
+                f"False positive! {ip} is a whitelisted admin IP. Do NOT block it. Episode failed."
             )
 
         if ip == MEDIUM_ATTACKER_IP:

@@ -401,26 +401,26 @@ def build_gradio_ui() -> gr.Blocks:
                       <td style="padding:8px 12px;color:#e2e8f0;">access.log</td>
                       <td style="padding:8px 12px;color:#e2e8f0;">404 flood from 10.0.0.1</td>
                       <td style="padding:8px 12px;color:#38bdf8;font-family:monospace;">block_ip("10.0.0.1")</td>
-                      <td style="padding:8px 12px;text-align:right;color:#22c55e;">+9.0</td>
+                      <td style="padding:8px 12px;text-align:right;color:#22c55e;">+1.0</td>
                     </tr>
                     <tr style="border-bottom:1px solid #1e293b;">
                       <td style="padding:8px 12px;color:#f59e0b;font-weight:700;">🟡 Medium</td>
                       <td style="padding:8px 12px;color:#e2e8f0;">auth.log</td>
                       <td style="padding:8px 12px;color:#e2e8f0;">SSH brute force from 10.0.0.2<br><span style="color:#64748b;font-size:11px;">⚠ 10.0.0.100 is whitelisted admin</span></td>
                       <td style="padding:8px 12px;color:#38bdf8;font-family:monospace;">block_ip("10.0.0.2")</td>
-                      <td style="padding:8px 12px;text-align:right;color:#22c55e;">+9.0</td>
+                      <td style="padding:8px 12px;text-align:right;color:#22c55e;">+1.0</td>
                     </tr>
                     <tr>
                       <td style="padding:8px 12px;color:#ef4444;font-weight:700;">🔴 Hard</td>
                       <td style="padding:8px 12px;color:#e2e8f0;">access.log</td>
                       <td style="padding:8px 12px;color:#e2e8f0;">backdoor.php C2 from 10.0.0.3</td>
                       <td style="padding:8px 12px;color:#38bdf8;font-family:monospace;">kill_process(PID)<br>delete_file("/var/www/html/backdoor.php")</td>
-                      <td style="padding:8px 12px;text-align:right;color:#22c55e;">+7.0</td>
+                      <td style="padding:8px 12px;text-align:right;color:#22c55e;">+1.0</td>
                     </tr>
                   </tbody>
                 </table>
                 <p style="color:#475569;font-size:11px;margin:12px 0 0;font-family:monospace;">
-                  Step penalty: −1/step &nbsp;|&nbsp; False positive: −10 &nbsp;|&nbsp; Episode cap: 20 steps
+                  False positive: Immediate Failure &nbsp;|&nbsp; Episode cap: 8 steps
                 </p>
                 """)
 
