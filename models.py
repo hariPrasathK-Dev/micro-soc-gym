@@ -7,7 +7,7 @@
 """
 Data models for the Micro Soc Gym Environment.
 
-The micro_soc_gym environment is a simple test environment that echoes back messages.
+
 """
 
 from openenv.core.env_server.types import Action, Observation
@@ -25,3 +25,4 @@ class MicroSocGymObservation(Observation):
 
     echoed_message: str = Field(default="", description="The echoed message")
     message_length: int = Field(default=0, description="Length of the echoed message")
+

@@ -16,7 +16,7 @@ RUN apt-get update && apt-get install -y \
 # Set working directory
 WORKDIR /app
 
-# Create log files and assign permissions for HF Spaces
+# Create log files and assign permissions for HuggingFace Spaces
 RUN touch /etc/nginx/blocklist.conf && \
     chmod 777 /etc/nginx/blocklist.conf && \
     touch /var/log/auth.log && \
@@ -44,7 +44,7 @@ RUN pip install --no-cache-dir .
 # Make the attack scripts executable
 RUN chmod +x scripts/*.sh
 
-# Expose port for HF
+# Expose port for HuggingFace
 EXPOSE 7860
 
 # Start Supervisord
