@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y \
     nginx \
     curl \
     supervisor \
+    dos2unix \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
@@ -38,13 +39,17 @@ COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 # Copy app code
 COPY . .
 
+# Fix Windows line endings and make scripts executable
+RUN dos2unix /app/scripts/*.sh && \
+    chmod +x /app/scripts/*.sh
+
 # Install Python dependencies
 RUN pip install --no-cache-dir .
 
 # Make the attack scripts executable
 RUN chmod +x scripts/*.sh
 
-# Expose port for HuggingFace
+# Expose port for HF
 EXPOSE 7860
 
 # Start Supervisord
