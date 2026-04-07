@@ -7,6 +7,7 @@
 import os
 import re
 import subprocess
+import sys
 import time
 import uuid
 from typing import Optional
@@ -28,7 +29,11 @@ WEBROOT = "/var/www/html"
 # Scenario-specific attacker IPs injected by the attack scripts
 EASY_ATTACKER_IP = "10.0.0.1"
 MEDIUM_ATTACKER_IP = "10.0.0.2"
+HARD_ATTACKER_IP = "10.0.0.3"          # used by hard_attack.sh C2 loop
 MEDIUM_WHITELIST = {"10.0.0.100"}   # legitimate admin - blocking this is a false positive
+
+# Detect Windows dev environment — hard scenario disabled there (AV deletes backdoor.php)
+_IS_LINUX = sys.platform.startswith("linux")
 
 # Reward values
 REWARD_CORRECT_BLOCK = 10.0
@@ -89,6 +94,17 @@ class MicroSocGymEnvironment(Environment):
             os.remove(backdoor)
 
         # 4. Restart the correct attacker script via supervisord
+        #    Hard scenario disabled on non-Linux (Windows dev / AV removes backdoor.php)
+        if scenario == "hard" and not _IS_LINUX:
+            logs = "(hard scenario disabled in Windows dev mode — antivirus blocks backdoor.php creation)"
+            return MicroSocGymObservation(
+                logs=logs,
+                reward=0.0,
+                done=False,
+                success=False,
+                info="[disabled in dev mode] Hard scenario requires Linux. Skipping attacker.",
+            )
+
         self._restart_attacker(scenario)
 
         # 5. Wait briefly so fresh logs are populated
