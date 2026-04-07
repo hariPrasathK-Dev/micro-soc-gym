@@ -33,7 +33,7 @@ RUN touch /etc/nginx/blocklist.conf && \
 
 # Copy config files
 COPY nginx-default /etc/nginx/sites-available/default
-COPY server/requirements.txt .
+COPY requirements.txt .
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 # Copy app code

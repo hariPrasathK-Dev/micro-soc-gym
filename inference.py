@@ -41,11 +41,15 @@ def main():
     for scenario_idx in range(3):
         obs = env_client.reset()
         
-        # In HTTP wrapper, state is obtained separately or embedded in observation
-        state = env_client.state()
-        task_name = state.get("scenario", "easy")
-
         inner_info = obs.get("observation", {}).get("info", "")
+        
+        # Extract scenario from the initial info string
+        task_name = "easy"
+        if "Scenario: medium" in inner_info:
+            task_name = "medium"
+        elif "Scenario: hard" in inner_info:
+            task_name = "hard"
+
         # Skip hard scenario if disabled
         if "disabled" in inner_info.lower():
             continue
@@ -135,7 +139,7 @@ def main():
             )
 
         # End of Episode
-        score = env_client.state().get("total_reward", 0.0)
+        score = sum(rewards)
         rewards_str = ",".join(f"{r:.2f}" for r in rewards) if rewards else "0.00"
         
         # Emit [END] event
