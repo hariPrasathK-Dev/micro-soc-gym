@@ -239,6 +239,4 @@ Prior to deployment, the environment underwent strict automated compliance testi
 
 The following demonstration showcases the interactive **Gradio Telemetry Dashboard** hosted on Hugging Face Spaces. It provides a visual, real-time representation of the triage environment, allowing users to manually act as the responding agent. By analyzing live log streams and manually executing remediation tools, users can intuitively understand the environment's mechanics, active threat scenarios, and the precise constraints an AI agent must navigate.
 
-<video src="UI-workflow.mp4" controls="controls" muted="muted" style="max-width: 100%;">
-  Your browser does not support the HTML5 video tag. If you cannot see the video, <a href="UI-workflow.mp4">click here to download or view it directly</a>.
-</video>
+https://github.com/user-attachments/assets/d8978acb-e636-4ea6-9ece-084598976c6b
