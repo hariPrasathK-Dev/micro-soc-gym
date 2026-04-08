@@ -155,14 +155,21 @@ def _print_obs(obs: Dict[str, Any]) -> None:
 
 def run_easy(client: MicroSocGymClient) -> float:
     _banner("SCENARIO 1 / EASY — Noisy Scanner")
-    print("  Expected action: block_ip('10.0.0.1')")
+    print("  Expected action: block_ip(...) based on logs")
 
     obs = client.reset()
     _print_obs(obs)
 
+    # Parse the logs to find the IP that floods
+    import re
+    from collections import Counter
+    logs = obs.get("observation", {}).get("logs", "")
+    ip_counts = Counter(re.findall(r"^([\d\.]+)", logs, re.MULTILINE))
+    attacker_ip = ip_counts.most_common(1)[0][0] if ip_counts else "10.0.0.1"
+
     # Optimal agent: one correct action
-    print("  → Sending: block_ip(10.0.0.1)")
-    obs = client.step(tool="block_ip", ip_address="10.0.0.1")
+    print(f"  → Sending: block_ip({attacker_ip})")
+    obs = client.step(tool="block_ip", ip_address=attacker_ip)
     _print_obs(obs)
     
     total = obs.get("reward", 0.0)
@@ -173,17 +180,26 @@ def run_easy(client: MicroSocGymClient) -> float:
 
 def run_medium(client: MicroSocGymClient) -> float:
     _banner("SCENARIO 2 / MEDIUM — Stealthy Brute Force")
-    print("  Expected action: block_ip('10.0.0.2'), NOT 10.0.0.100 (whitelisted admin)")
+    print("  Expected action: block_ip(...) (brute-force IP, not whitelisted admin)")
 
     obs = client.reset()
     # Wait a bit extra — medium writes every 4s
     print("  (waiting 5s for auth.log to populate…)")
+    import time
+    import re
+    from collections import Counter
     time.sleep(5)
     # The subsequent step() action will read the newly populated logs.
     _print_obs(obs)
 
-    print("  → Sending: block_ip(10.0.0.2)  [correct attacker]")
-    obs = client.step(tool="block_ip", ip_address="10.0.0.2")
+    # find brute-force attacker by parsing fail counts
+    logs = obs.get("observation", {}).get("logs", "")
+    failures = re.findall(r"Failed password.*from ([\d\.]+)", logs)
+    fail_counts = Counter(failures)
+    attacker_ip = fail_counts.most_common(1)[0][0] if fail_counts else "10.0.0.2"
+
+    print(f"  → Sending: block_ip({attacker_ip})  [correct attacker]")
+    obs = client.step(tool="block_ip", ip_address=attacker_ip)
     _print_obs(obs)
 
     total = obs.get("reward", 0.0)
@@ -197,10 +213,6 @@ def run_hard(client: MicroSocGymClient) -> float:
 
     obs = client.reset()
     _print_obs(obs)
-
-    if "disabled" in obs.get("info", "").lower():
-        print("  [SKIP] Hard scenario disabled in this environment (likely Windows dev mode).")
-        return 0.0
 
     # In the hard scenario the logs show the attacker PID via the process list.
     # For the client demo we ask the /state endpoint; a real RL agent would

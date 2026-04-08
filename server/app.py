@@ -8,11 +8,11 @@
 FastAPI + Gradio application for the Micro-SOC Gym Environment.
 
 Endpoints (OpenEnv API):
-    POST /reset   — Start a new episode
-    POST /step    — Execute an agent action
-    GET  /state   — Episode metadata
-    GET  /schema  — Action/observation schemas
-    GET  /health  — Liveness probe
+    POST /reset   - Start a new episode
+    POST /step    - Execute an agent action
+    GET  /state   - Episode metadata
+    GET  /schema  - Action/observation schemas
+    GET  /health  - Liveness probe
 
 Gradio UI (served at /):
     Interactive SOC dashboard for judges / manual demos.
@@ -20,13 +20,11 @@ Gradio UI (served at /):
 """
 
 from __future__ import annotations
-
-import time
 from typing import List, Tuple
 
 try:
     from openenv.core.env_server.http_server import create_app
-except Exception as e:  # pragma: no cover
+except Exception as e:
     raise ImportError(
         "openenv is required. Install dependencies with '\n    uv sync\n'"
     ) from e
@@ -42,7 +40,7 @@ from models import MicroSocGymAction, MicroSocGymObservation
 from server.micro_soc_gym_environment import MicroSocGymEnvironment
 
 # ---------------------------------------------------------------------------
-# Singleton environment — shared between OpenEnv HTTP API and Gradio UI
+# Singleton environment - shared between OpenEnv HTTP API and Gradio UI
 # ---------------------------------------------------------------------------
 
 _env_singleton = MicroSocGymEnvironment()
@@ -77,25 +75,25 @@ SCENARIO_LABELS = {
 
 SCENARIO_DESCRIPTIONS = {
     "easy": (
-        "<b>What is happening:</b> An attacker at <code>10.0.0.1</code> is flooding the server with "
+        "<b>What is happening:</b> An attacker is flooding the server with "
         "hundreds of 404 requests (a port/path scanner).<br>"
         "<b>What to do:</b> Block their IP using <code>block_ip</code>.<br>"
-        "<b>Correct action:</b> <code style='color:#38bdf8'>block_ip(\"10.0.0.1\")</code><br>"
-        "<b>Warning:</b> Do NOT block <code>10.0.0.100</code> - that is a whitelisted admin."
+        "<b>Correct action:</b> <code style='color:#38bdf8'>block_ip(\"&lt;attacker_ip&gt;\")</code><br>"
+        "<b>Warning:</b> Do NOT block legitimate traffic."
     ),
     "medium": (
-        "<b>What is happening:</b> An attacker at <code>10.0.0.2</code> is brute-forcing SSH logins. "
+        "<b>What is happening:</b> An attacker is brute-forcing SSH logins. "
         "You will see repeated failed auth attempts in <code>auth.log</code>.<br>"
         "<b>What to do:</b> Block the attacker's IP, NOT the admin IP.<br>"
-        "<b>Correct action:</b> <code style='color:#38bdf8'>block_ip(\"10.0.0.2\")</code><br>"
-        "<b>Warning:</b> <code>10.0.0.100</code> is a whitelisted admin - blocking them = instant failure."
+        "<b>Correct action:</b> <code style='color:#38bdf8'>block_ip(\"&lt;attacker_ip&gt;\")</code><br>"
+        "<b>Warning:</b> A random IP is a whitelisted admin - blocking them = instant failure."
     ),
     "hard": (
-        "<b>What is happening:</b> A webshell (<code>backdoor.php</code>) has been planted and is making "
-        "C2 callbacks from <code>10.0.0.3</code>. A malicious process is running on the server.<br>"
+        "<b>What is happening:</b> A webshell (e.g., <code>backdoor.php</code>) has been planted and is making "
+        "C2 callbacks. A malicious process is running on the server.<br>"
         "<b>What to do:</b> Two actions required: kill the process AND delete the backdoor file.<br>"
         "<b>Correct actions:</b> <code style='color:#38bdf8'>kill_process(PID)</code> then "
-        "<code style='color:#38bdf8'>delete_file(\"/var/www/html/backdoor.php\")</code><br>"
+        "<code style='color:#38bdf8'>delete_file(\"/var/www/html/&lt;backdoor_name&gt;\")</code><br>"
         "<b>Tip:</b> Look for a PID in brackets <code>[1234]</code> in the log lines."
     ),
     "": (
@@ -190,7 +188,6 @@ def _outcome_banner_html(done: bool, success: bool, total_reward: float) -> str:
 
 
 def _make_reward_plot(history: List[Tuple[int, float]]):
-    """Build a simple HTML SVG sparkline for the reward curve."""
     if not history:
         return '<div style="color:#9ca3af;font-style:italic;padding:20px 0;">No reward data yet. Start an episode.</div>'
 
@@ -232,11 +229,10 @@ def _make_reward_plot(history: List[Tuple[int, float]]):
 
 
 # ---------------------------------------------------------------------------
-# Gradio event handlers — all operate on _env_singleton directly
+# Gradio event handlers - all operate on _env_singleton directly
 # ---------------------------------------------------------------------------
 
 def handle_reset():
-    """Reset the environment and return updated UI state."""
     global _reward_history, _action_history, _last_feedback
     _reward_history = []
     _action_history = []
@@ -258,10 +254,9 @@ def handle_reset():
 
 
 def handle_step(tool: str, ip_address: str, file_path: str, pid_str: str):
-    """Execute an agent action and return updated UI state."""
     global _reward_history, _action_history, _last_feedback
 
-    # Gradio passes None for hidden/empty textboxes — coerce to str first
+    # Gradio passes None for hidden/empty textboxes - coerce to str first
     ip_address = (ip_address or "").strip()
     file_path  = (file_path  or "").strip()
     pid_str    = (pid_str    or "").strip()
@@ -319,9 +314,6 @@ def handle_step(tool: str, ip_address: str, file_path: str, pid_str: str):
     return badge, scenario_info, logs, steps, reward, action_hist, outcome, plot, step_btn
 
 
-
-
-
 # ---------------------------------------------------------------------------
 # Gradio layout
 # ---------------------------------------------------------------------------
@@ -358,7 +350,7 @@ HEAD = """
 def build_gradio_ui() -> gr.Blocks:
     with gr.Blocks(css=CSS, head=HEAD, title="Micro-SOC Gym") as demo:
 
-        # ── Title
+        # Title
         gr.HTML("""
         <div style="text-align:center;padding:32px 0 12px;">
           <h1 class="soc-title">Micro-SOC Gym</h1>
@@ -368,23 +360,23 @@ def build_gradio_ui() -> gr.Blocks:
         </div>
         """)
 
-        # ── Top row: scenario badge + reset button
+        # Top row: scenario badge + reset button
         with gr.Row():
             with gr.Column(scale=3):
                 scenario_badge = gr.HTML(_scenario_badge(""))
             with gr.Column(scale=1):
                 reset_btn = gr.Button("⟳  Reset / New Episode", elem_classes="btn-reset", size="lg")
 
-        # ── Scenario info panel (what is the threat + what action to take)
+        # Scenario info panel (what is the threat + what action to take)
         scenario_info = gr.HTML(_scenario_info_html(""))
 
-        # ── Main two-column layout
+        # Main two-column layout
         with gr.Row():
 
-            # Left — Live log viewer
+            # Left - log viewer
             with gr.Column(scale=3, elem_classes="panel"):
                 gr.HTML('<p style="color:#94a3b8;font-size:13px;margin:0 0 8px;font-family:monospace;">'
-                        'LIVE LOG STREAM '
+                        'LOG STREAM '
                         '<span style="color:#475569;font-weight:400;">- The raw log file the agent must analyse</span></p>')
                 log_output = gr.Textbox(
                     show_label=False,
@@ -396,7 +388,7 @@ def build_gradio_ui() -> gr.Blocks:
                     elem_classes="log-box",
                 )
 
-            # Right — Controls + stats
+            # Right - Controls + stats
             with gr.Column(scale=2, elem_classes="panel"):
 
                 gr.HTML('<p style="color:#94a3b8;font-size:13px;margin:0 0 12px;font-family:monospace;">EPISODE STATS</p>')
@@ -427,7 +419,7 @@ def build_gradio_ui() -> gr.Blocks:
                 )
                 ip_input = gr.Textbox(
                     label="IP Address  (for block_ip)",
-                    placeholder="e.g. 10.0.0.1",
+                    placeholder="e.g. 192.168.1.5",
                     interactive=True,
                 )
                 file_input = gr.Textbox(
@@ -448,10 +440,10 @@ def build_gradio_ui() -> gr.Blocks:
                     interactive=False,
                 )
 
-        # ── Episode outcome banner
+        # Episode outcome banner
         outcome_banner = gr.HTML(_outcome_banner_html(False, False, 0.0))
 
-        # ── Action history
+        # Action history
         with gr.Row():
             with gr.Column(elem_classes="panel"):
                 gr.HTML('<p style="color:#94a3b8;font-size:13px;margin:0 0 10px;font-family:monospace;">'
@@ -459,13 +451,13 @@ def build_gradio_ui() -> gr.Blocks:
                         '<span style="color:#475569;font-weight:400;">- Every action the agent took this episode</span></p>')
                 action_history_html = gr.HTML(_action_history_html([]))
 
-        # ── Reward curve
+        # Reward curve
         with gr.Row():
             with gr.Column(elem_classes="panel"):
                 gr.HTML('<p style="color:#94a3b8;font-size:13px;margin:0 0 12px;font-family:monospace;">CUMULATIVE REWARD CURVE</p>')
                 reward_chart = gr.HTML(_make_reward_plot([]))
 
-        # ── Scenario reference table
+        # Scenario reference table
         with gr.Row():
             with gr.Column(elem_classes="panel"):
                 gr.HTML("""
@@ -480,24 +472,24 @@ def build_gradio_ui() -> gr.Blocks:
                   </tr></thead>
                   <tbody>
                     <tr style="border-bottom:1px solid #1e293b;">
-                      <td style="padding:8px 12px;color:#22c55e;font-weight:700;">🟢 Easy</td>
+                      <td style="padding:8px 12px;color:#22c55e;font-weight:700;">Easy</td>
                       <td style="padding:8px 12px;color:#e2e8f0;">access.log</td>
-                      <td style="padding:8px 12px;color:#e2e8f0;">404 flood from 10.0.0.1</td>
-                      <td style="padding:8px 12px;color:#38bdf8;">block_ip("10.0.0.1")</td>
+                      <td style="padding:8px 12px;color:#e2e8f0;">404 flood from random attacker IP</td>
+                      <td style="padding:8px 12px;color:#38bdf8;">block_ip("&lt;attacker_ip&gt;")</td>
                       <td style="padding:8px 12px;text-align:right;color:#22c55e;">+1.0</td>
                     </tr>
                     <tr style="border-bottom:1px solid #1e293b;">
-                      <td style="padding:8px 12px;color:#f59e0b;font-weight:700;">🟡 Medium</td>
+                      <td style="padding:8px 12px;color:#f59e0b;font-weight:700;">Medium</td>
                       <td style="padding:8px 12px;color:#e2e8f0;">auth.log</td>
-                      <td style="padding:8px 12px;color:#e2e8f0;">SSH brute-force from 10.0.0.2<br><span style="color:#64748b;font-size:11px;">10.0.0.100 is whitelisted - do NOT block</span></td>
-                      <td style="padding:8px 12px;color:#38bdf8;">block_ip("10.0.0.2")</td>
+                      <td style="padding:8px 12px;color:#e2e8f0;">SSH brute-force from random attacker IP<br><span style="color:#64748b;font-size:11px;">Whitelisted IPs are mixed in - do NOT block</span></td>
+                      <td style="padding:8px 12px;color:#38bdf8;">block_ip("&lt;attacker_ip&gt;")</td>
                       <td style="padding:8px 12px;text-align:right;color:#22c55e;">+1.0</td>
                     </tr>
                     <tr>
-                      <td style="padding:8px 12px;color:#ef4444;font-weight:700;">🔴 Hard</td>
+                      <td style="padding:8px 12px;color:#ef4444;font-weight:700;">Hard</td>
                       <td style="padding:8px 12px;color:#e2e8f0;">access.log</td>
-                      <td style="padding:8px 12px;color:#e2e8f0;">backdoor.php C2 from 10.0.0.3</td>
-                      <td style="padding:8px 12px;color:#38bdf8;">kill_process(PID)<br>delete_file("/var/www/html/backdoor.php")</td>
+                      <td style="padding:8px 12px;color:#e2e8f0;">random backdoor C2 file from random IP</td>
+                      <td style="padding:8px 12px;color:#38bdf8;">kill_process(PID)<br>delete_file("/var/www/html/&lt;backdoor_name&gt;")</td>
                       <td style="padding:8px 12px;text-align:right;color:#22c55e;">+1.0</td>
                     </tr>
                   </tbody>
@@ -507,7 +499,7 @@ def build_gradio_ui() -> gr.Blocks:
                 </p>
                 """)
 
-        # ── Wiring
+        # Wiring
         _ui_outputs = [
             scenario_badge, scenario_info, log_output, steps_box, reward_box,
             action_history_html, outcome_banner, reward_chart, step_btn,
@@ -530,24 +522,12 @@ def build_gradio_ui() -> gr.Blocks:
     return demo
 
 
-# ---------------------------------------------------------------------------
 # Mount Gradio onto the FastAPI app
-# ---------------------------------------------------------------------------
-
 gradio_ui = build_gradio_ui()
 app = gr.mount_gradio_app(app, gradio_ui, path="/")
 
 
-# ---------------------------------------------------------------------------
-# Dev server entry point
-# ---------------------------------------------------------------------------
-
 def main():
-    """
-    Run the server directly:
-        uvicorn server.app:app --host 0.0.0.0 --port 7860
-        python -m server.app
-    """
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=7860)
 

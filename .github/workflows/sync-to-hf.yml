@@ -15,7 +15,14 @@ jobs:
           fetch-depth: 0
           lfs: true # Crucial if you have large files tracked by Git LFS
           
+      - name: Remove MP4 files before pushing
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          find . -name "*.mp4" -type f -exec git rm --cached {} + || true
+          git commit -m "Exclude mp4 files" || true
+
       - name: Push to Hugging Face Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: git push --force https://harinie4466:$HF_TOKEN@huggingface.co/spaces/harinie4466/micro-soc-gym main
+        run: git push --force https://harinie4466:$HF_TOKEN@huggingface.co/spaces/harinie4466/micro-soc-gym HEAD:main

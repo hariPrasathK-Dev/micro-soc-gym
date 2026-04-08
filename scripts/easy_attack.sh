@@ -1,23 +1,31 @@
 #!/bin/bash
-# Easy: Attacker 10.0.0.1 repeatedly requests for 404 paths while normal users browse normal pages
-echo "Starting easy attack (noisy scanner + normal traffic)..."
+# Easy: Attacker repeatedly requests for 404 paths while normal users browse normal pages
 
-# Normal user IPs as decoys
-NORMAL_IPS=("10.0.0.50" "10.0.0.51" "10.0.0.52" "10.0.0.53")
+if [ -f /tmp/micro_soc_state.env ]; then
+    source /tmp/micro_soc_state.env
+    ATTACKER_IP=$EASY_ATTACKER_IP
+else
+    ATTACKER_IP="$((RANDOM % 255 + 1)).$((RANDOM % 255)).$((RANDOM % 255)).$((RANDOM % 255))"
+    EASY_NORMAL_IPS=("$((RANDOM % 255 + 1)).$((RANDOM % 255)).$((RANDOM % 255)).$((RANDOM % 255))" "$((RANDOM % 255 + 1)).$((RANDOM % 255)).$((RANDOM % 255)).$((RANDOM % 255))")
+fi
+
+NORMAL_IPS=("${EASY_NORMAL_IPS[@]}")
 NORMAL_PATHS=("/" "/index.html" "/about" "/contact" "/products" "/favicon.ico")
 COUNTER=0
 
+echo "Starting easy scenario attack..."
+
 while true; do
     # Attacker does rapid scan of suspicious paths
-    curl -s -H "X-Forwarded-For: 10.0.0.1" http://localhost/admin > /dev/null
-    curl -s -H "X-Forwarded-For: 10.0.0.1" http://localhost/.env > /dev/null
-    curl -s -H "X-Forwarded-For: 10.0.0.1" http://localhost/wp-login.php > /dev/null
-    curl -s -H "X-Forwarded-For: 10.0.0.1" http://localhost/phpmyadmin > /dev/null
-    curl -s -H "X-Forwarded-For: 10.0.0.1" http://localhost/.git/config > /dev/null
+    curl -s -H "X-Forwarded-For: $ATTACKER_IP" http://localhost/admin > /dev/null
+    curl -s -H "X-Forwarded-For: $ATTACKER_IP" http://localhost/.env > /dev/null
+    curl -s -H "X-Forwarded-For: $ATTACKER_IP" http://localhost/wp-login.php > /dev/null
+    curl -s -H "X-Forwarded-For: $ATTACKER_IP" http://localhost/phpmyadmin > /dev/null
+    curl -s -H "X-Forwarded-For: $ATTACKER_IP" http://localhost/.git/config > /dev/null
 
     COUNTER=$((COUNTER + 1))
 
-    # Every other cycle, 1-2 normal user requests to mix in normal traffic
+    # Every other cycle includes 1-2 normal user requests to mix in normal traffic
     if [ $((COUNTER % 2)) -eq 0 ]; then
         IP=${NORMAL_IPS[$((RANDOM % ${#NORMAL_IPS[@]}))]}
         PATH_=${NORMAL_PATHS[$((RANDOM % ${#NORMAL_PATHS[@]}))]}

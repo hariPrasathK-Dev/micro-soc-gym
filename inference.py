@@ -1,7 +1,6 @@
-import json
 import os
 import re
-import sys
+import json
 from typing import List
 
 from openai import OpenAI
@@ -12,9 +11,9 @@ from client import MicroSocGymClient
 # ---------------------------------------------------------------------------
 # Required Environment Configuration via os.getenv
 # ---------------------------------------------------------------------------
-API_BASE_URL = os.getenv("API_BASE_URL") or "https://router.huggingface.co/v1"
-MODEL_NAME = os.getenv("MODEL_NAME") or "Qwen/Qwen2.5-72B-Instruct"
-API_KEY = os.getenv("HF_TOKEN") or os.getenv("API_KEY") or "EMPTY"
+API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
+MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
+HF_TOKEN = os.getenv("HF_TOKEN")
 
 BENCHMARK = os.getenv("MY_ENV_V4_BENCHMARK", "micro_soc_gym")
 MAX_STEPS = 8
@@ -31,10 +30,9 @@ def extract_json(text: str) -> str:
 
 def main():
     # Instantiate the OpenAI client
-    client = OpenAI(api_key=API_KEY, base_url=API_BASE_URL)
+    client = OpenAI(api_key=HF_TOKEN, base_url=API_BASE_URL)
     
-    # We must connect to the live Docker Environment (The "World") via HTTP
-    # This prevents Windows executing Linux specific background logic.
+    # We must connect to the live Docker Environment via HTTP
     env_client = MicroSocGymClient(base_url="http://localhost:7860")
 
     # The environment has exactly 3 specific scenarios.
@@ -139,8 +137,6 @@ def main():
                 # Catch validation layers (e.g., Pydantic parsing errors)
                 error_msg = str(e).replace('\n', ' ')
                 action_str = action_str or "{}"
-                # The agent failed severely (likely syntax error), step ends 
-                # but we give it a chance to try again next step unless MAX_STEPS reached
                 reward = 0.0
                 rewards.append(reward)
                 done = False
