@@ -11,14 +11,14 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          fetch-depth: 1 # Changed to 1: We only need the latest files!
+          fetch-depth: 1
           lfs: true
           
       - name: Build clean history and push to Hugging Face
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          # 1. Delete the GitHub git history so HF never sees old commits with the video
+          # 1. Delete the GitHub git history
           rm -rf .git
           
           # 2. Start a fresh, clean git repository just for this deployment
@@ -26,12 +26,17 @@ jobs:
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
           
-          # 3. Add all current files, then explicitly UNTRACK the mp4 files
+          # 3. Add all current files
           git add .
+          
+          # 4. Explicitly UNTRACK videos AND images
           find . -name "*.mp4" -type f -exec git rm --cached {} + || true
+          find . -name "*.png" -type f -exec git rm --cached {} + || true
+          find . -name "*.jpg" -type f -exec git rm --cached {} + || true
+          find . -name "*.jpeg" -type f -exec git rm --cached {} + || true
           
-          # 4. Make a single clean commit without the video
-          git commit -m "Deploy to Hugging Face (excluding mp4 files)"
+          # 5. Make a single clean commit without media files
+          git commit -m "Deploy to Hugging Face (excluding media files)"
           
-          # 5. Force push this clean slate to Hugging Face
+          # 6. Force push this clean slate to Hugging Face
           git push --force https://harinie4466:$HF_TOKEN@huggingface.co/spaces/harinie4466/micro-soc-gym main
