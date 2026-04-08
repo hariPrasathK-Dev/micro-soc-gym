@@ -4,125 +4,141 @@ sdk: docker
 app_port: 7860
 ---
 
-# Micro-SOC Gym Environment
-
-A Reinforcement Learning Environment simulating a Security Operations Center (SOC) triage engine.
-Built for the Meta × Hugging Face × PyTorch OpenEnv Hackathon 2026.
-
----
-
-## 1. Executive Summary
-
-Micro-SOC Gym models a high-stakes, real-time Security Operations Center environment designed for Reinforcement Learning (RL) agents. Rather than relying on rigid predefined simulators, the environment utilizes an active monolithic Docker container. RL agents are tasked with ingesting live `nginx` and `auth` logs to identify malicious network behavior and executing targeted remedial actions without disrupting legitimate infrastructure.
-
-## 2. Simulated Threat Scenarios
-
-The environment programmatically transitions through tiered security incidents during its lifecycle. Agents must adapt their decision-making logic recursively as the threat models increase in complexity.
-
-### Scenario 1: Volumetric Network Scanning
-- **Description:** A primary Host emits a high frequency of `HTTP 404` errors directed at non-existent administrative endpoints.
-- **Agent Objective:** Parse the target log stream, identify the offending IP, and apply an application-layer block.
-- **Evaluation Criteria:** Reward +1.0 for correctly deploying `block_ip(IP)`.
-
-### Scenario 2: Identity Compromise & Subnet Decoys
-- **Description:** Methodical SSH credential stuffing attempts are isolated within `auth.log`.
-- **Agent Objective:** Deploy a surgical IP block against the attacking node.
-- **Evaluation Criteria:** Legitimate administrative traffic (e.g., IP `10.0.0.100`) is mixed within the log stream. Agents utilizing broad subnet bans will inadvertently block administrative access, resulting in a critical incident failure (Reward 0.0).
-
-### Scenario 3: Active Command and Control (C2) Remediation
-- **Description:** A persistent threat has established a PHP backdoor within the application root and is executing Base64-encoded command sequences.
-- **Agent Objective:** Conduct a multi-stage kill-chain operation to remediate the compromised asset.
-- **Evaluation Criteria:** The agent must sequentially execute `kill_process(PID)` and `delete_file(FILE)` to safely terminate the session.
+<div align="center">
+  <img alt="Micro-SOC Gym" src="https://img.shields.io/badge/OpenEnv-Compatible-blue.svg">
+  <h1>Micro-SOC Gym</h1>
+  <p><strong>A Real-Time, Dockerized Security Operations Center (SOC) Triage Benchmark for Reinforcement Learning Agents.</strong></p>
+  <p>Built for the <b>Meta × Hugging Face × PyTorch OpenEnv Hackathon 2026</b>.</p>
+</div>
 
 ---
 
-## 3. Architecture & Interface Specifications
+## Table of Contents
 
-### 3.1 Observation Space
-The environment exposes state via the `MicroSocGymObservation` JSON payload:
-- `logs` (String): A realtime 50-line tail buffer of the relevant target log.
-- `reward` (Float): Current environment score bound between `0.0` and `1.0`.
-- `done` (Boolean): Indicates terminal state or critical system failure.
-- `success` (Boolean): Confirms successful neutralization of the active threat.
-- `info` (String): Contextual metadata and grading feedback.
-
-### 3.2 Action Space
-Agents interface with the infrastructure via the `MicroSocGymAction` definitions:
-- `block_ip(ip_address: str)`: Commits the specified node to the Nginx blocklist.
-- `delete_file(file_path: str)`: Removes unverified binaries from the host path.
-- `kill_process(pid: int)`: Transmits a SIGKILL signal to the identified rogue process.
-
-### 3.3 Security & Systems Engineering Constraints
-Due to the unprivileged container constraints imposed by standard Hugging Face Spaces (preventing kernel-level `iptables` rules), this environment handles infrastructure networking by leveraging `supervisord` overhead. Nginx processes are controlled in tandem with dummy attacker bash scripts to generate functional mock systems via pseudo-firewall loopbacks (by writing dynamically to `/etc/nginx/blocklist.conf`).
+- [1. Environment Description & Motivation](#1-environment-description--motivation)
+- [2. Observation & Action Space](#2-observation--action-space)
+- [3. Task Descriptions & Difficulty](#3-task-descriptions--difficulty)
+- [4. Setup & Usage Instructions](#4-setup--usage-instructions)
+- [5. Baseline Scores](#5-baseline-scores)
+- [6. Project Architecture](#6-project-architecture)
 
 ---
 
-## 4. Evaluation and Baseline Scoring
+## 1. Environment Description & Motivation
 
-To benchmark internal models, ensure the required network packages are present and execute the validation protocols.
+### Overview
+**Micro-SOC Gym** models a high-stakes, real-time Security Operations Center workload designed strictly for evaluating Reinforcement Learning (RL) agents and LLMs. Rather than interacting with static datasets or grid-world simulators, agents interface with a live, monolithic Docker container running production-grade services. 
 
-| Task Category | Difficulty | Evaluation Result | Diagnostic Score |
-| :--- | :--- | :--- | :--- |
-| **Noisy Scanner** | Basic | TBD | TBD |
-| **Stealth Brute Force** | Intermediate | TBD | TBD |
-| **Active Webshell** | Advanced | TBD | TBD |
-| **Global Benchmark** | | | **TBD / 1.00** |
+The environment provisions a FastAPI backend, simulated daemons (`nginx`, `sshd`), and orchestrated attacker scripts. Agents perform threat triage just like real analysts: by parsing unstructured server log streams, mapping threats, and executing exact remediation actions.
 
-*(Note: Baseline scores are generated using the `inference.py` runtime script powered by the `Qwen/Qwen2.5-72B-Instruct` model through the Hugging Face Inference API.)*
+### Motivation
+Standard LLM benchmarks test static multi-choice or simple generation capabilities. **Micro-SOC Gym** forces the agent into a proactive system administration role. It bridges the gap between cybersecurity and AI by heavily challenging an agent's ability to:
+1. Handle "noisy" data streams (identifying signal amidst decoy traffic).
+2. Sequentially build and execute a multi-tier remediation plan.
+3. Understand precise constraints to avoid *False Positives*—where overly aggressive actions cause catastrophic system failure by blocking legitimate network infrastructure.
 
 ---
 
-## 5. Setup and Operational Directives
+## 2. Observation & Action Space
 
-### 5.1 Local Container Orchestration
-The primary environment operates as a self-contained monolith.
+This environment conforms to the standard **OpenEnv** HTTP JSON schema patterns via integrated Pydantic definitions.
+
+### 2.1 Observation Space
+State observations are fed continuously to the agent via the `MicroSocGymObservation` dictionary payload:
+
+- **`logs` (String)**: A real-time 50-line stream output representing the targeted log asset (`/var/log/nginx/access.log` or `/var/log/auth.log`).
+- **`reward` (Float)**: Immediate reinforcement mapping to the agent's recent action (+1.0 for success, 0.0 for penalties/noise).
+- **`done` (Boolean)**: Marks terminal episode conditions (Success, Failure, or Max-Steps Exhaustion).
+- **`success` (Boolean)**: Directly indicates if the active threat has been fully neutralized.
+- **`info` (String)**: Grader feedback and human-readable context hints.
+
+### 2.2 Action Space
+Instead of simple directional movements, the agent manipulates an infrastructure API. The `MicroSocGymAction` requires specifying exactly one remediation `tool` per step:
+
+1. **`block_ip(ip_address: str)`**
+   - Targets network ingress. Commits the rogue IP explicitly to the target's `/etc/nginx/blocklist.conf`.
+2. **`kill_process(pid: int)`**
+   - Transmits a system-level `SIGKILL` to forcefully terminate unauthorized command-and-control background processes. 
+3. **`delete_file(file_path: str)`**
+   - Permanently deletes verified malware, webshells, or backdoor executable scripts from the host disk layer.
+
+---
+
+## 3. Task Descriptions & Difficulty
+
+The environment sequences through tiered adversarial scenarios via a round-robin rotation upon iteration (`/reset`). Agents must shift strategies depending on the active threat intelligence.
+
+| Difficulty | Name & Mechanics | Win Condition & Constraints |
+| :---: | :--- | :--- |
+| **🟢 Easy** | **Volumetric Network Scanning**<br>A specific host originates a high frequency of `HTTP 404` errors traversing non-existent administrative endpoints (e.g., `/admin`, `/wp-login.php`). | **Goal:** Parse `access.log` and invoke `block_ip(IP)`.<br>**Constraint:** Minimal. Rapid detection and blocking resolves the threat. |
+| **🟡 Medium** | **Identity Compromise & Subnet Decoys**<br>An attacker conducts sustained SSH credential stuffing attempts visible within `auth.log`. Legitimate admin logins intermingle. | **Goal:** Map the brute force IP and invoke `block_ip(IP)`.<br>**Constraint:** Extreme False-Positive penalty. Blocking the recognized admin subnet (`10.0.0.100`) triggers an immediate critical failure. |
+| **🔴 Hard** | **Active Command and Control (C2)**<br>A persistent threat has rooted the webserver via a PHP backdoor (`backdoor.php`) and actively dispatches base64-encoded shell commands to live PIDs. | **Goal:** Execute a multi-stage kill chain.<br>**Constraint:** Agents must first sever the session via `kill_process(PID)` *and* sequentially invoke `delete_file(FILE)`. Neither action alone will stabilize the environment. *(Requires Unix/Linux process space)* |
+
+---
+
+## 4. Setup & Usage Instructions
+
+### 4.1 Operating the Docker Monolith (Local/Deploy)
+Because the environment performs system-level state management, it executes flawlessly inside an isolated Hugging Face Docker Space or a local Unix deployment.
+
 ```bash
-# 1. Compile the primary container asset
+# 1. Compile the self-contained container
 docker build -t micro-soc-gym .
 
-# 2. Deploy locally observing port 7860 standard constraints
+# 2. Deploy locally matching OpenEnv default ports
 docker run -p 7860:7860 micro-soc-gym
 ```
-Access the environment telemetry safely via the GUI accessible at `http://localhost:7860/`.
+**Bonus:** You can access the unified **Gradio Triage Dashboard** visually at `http://localhost:7860/` for manual testing and live-stream observation.
 
-### 5.2 Agent Execution Protocol
-To initiate the AI agent response simulation:
-```powershell
-# 1. Initialize local Python virtual environment dependencies
+### 4.2 Scripted Agent Initialization
+To launch a programmatically controlled AI agent test loop against your running server:
+
+```bash
+# 1. Provision virtual environment and dependencies
 python -m venv .venv
-.\.venv\Scripts\activate
+source .venv/bin/activate  # (Windows: .\.venv\Scripts\activate)
 pip install -r requirements.txt
 
-# 2. Assign environment variables mapping to valid access credentials
-$env:HF_TOKEN="<your_secure_hf_token>"
+# 2. Map Hugging Face Hub Credentials
+export HF_TOKEN="<your_secure_hugging_face_token>"
 
-# 3. Trigger standard inference
+# 3. Initiate Baseline Inference 
 python inference.py
 ```
 
 ---
 
-## 6. Project Structure
+## 5. Baseline Scores
+
+Agents have a maximum horizon of **8 steps** per scenario before timeout failure. The ideal score is **+1.0 per solved scenario**, peaking at a **+3.0 cumulative total**.
+
+| Agent Execution Model | Scenario: Easy | Scenario: Medium | Scenario: Hard | Final Score |
+| :--- | :---: | :---: | :---: | :---: |
+| **Qwen/Qwen2.5-72B-Instruct** | `[  ]` | `[  ]` | `[  ]` | `[   ] / 3.00` |
+| **Base Baseline (Random Choices)** | `0.00` | `0.00` | `0.00` | `0.00 / 3.00` |
+
+*(Insert your evaluated baseline runs in the empty spaces above).*
+
+---
+
+## 6. Project Architecture
+
+The codebase handles networking logic securely decoupled from kernel requirements via supervised orchestration.
 
 ```text
 micro_soc_gym/
-├── .dockerignore                     # Docker build optimization exclusions
-├── Dockerfile                        # Environment runtime manifest
-├── openenv.yaml                      # OpenEnv space configuration file
-├── requirements.txt                  # Consolidated unified Python dependency matrix
-├── supervisord.conf                  # Core process configuration and task controller
-├── inference.py                      # Automated LLM baseline execution script
-├── client.py                         # HTTP synchronous agent connection wrapper
-├── models.py                         # Application-layer Pydantic object schemas
-├── nginx-default                     # Nginx server routing and blocklist definitions
-│
-├── scripts/                          # Simulated Threat Injectors
-│   ├── easy_attack.sh                # Volumetric HTTP 404 flooding script
-│   ├── medium_attack.sh              # Sequential SSH brute-force simulator
-│   └── hard_attack.sh                # PHP remote code execution (RCE) setup utility
-│
-└── server/                           # OpenEnv Backend Services
-    ├── app.py                        # FastAPI endpoints and Gradio telemetry dashboard
-    ├── micro_soc_gym_environment.py  # Primary orchestration, environment state, and grader logic
-    └── __init__.py                   # Core service exports
+├── Dockerfile                        # Environment runtime manifest & OS provisions
+├── openenv.yaml                      # OpenEnv space requirement configuration
+├── requirements.txt                  # Python dependencies map
+├── supervisord.conf                  # Daemon management orchestrator (Nginx, API, Attacks)
+├── server/                           # OpenEnv Backend Services
+│   ├── app.py                        # FastAPI endpoints and Gradio Telemetry Dashboard
+│   └── micro_soc_gym_environment.py  # Primary orchestration, grader matrix, and rules engines
+├── scripts/                          # Subprocess Attack Generators
+│   ├── easy_attack.sh                # Volumetric target traffic creator
+│   ├── medium_attack.sh              # Mock SSH Brute-Force + Decoys
+│   └── hard_attack.sh                # Webshell runtime process simulation
+├── inference.py                      # Automated LLM ReAct agent testing loop 
+├── client.py                         # Synchronous HTTP validation client
+└── models.py                         # Application-layer Pydantic schema exports
 ```
