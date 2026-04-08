@@ -11,7 +11,6 @@ tags:
   <h1>Micro SOC Gym</h1>
   <p><strong>A Real time, Docker-Based Benchmark for RL Agents in Security Operations Center (SOC) Triage</strong></p>
   <p>Built for the <b>Meta × Hugging Face × PyTorch OpenEnv Hackathon 2026</b>.</p>
-  <br>
 </div>
 
 ## Table of Contents
@@ -100,8 +99,7 @@ To help visualise the environment, we built an interactive Gradio Dashboard whic
 
 It lets you manually play the role of the responding agent. By reading the logs, triggering tools, and seeing how the environment scores your actions, you can easily understand the mechanics, constraints, and underlying reward logic the Agent has to learn.
 
-https://github.com/user-attachments/assets/d8978acb-e636-4ea6-9ece-084598976c6b
-
+<video src="media/gradio-dashboard.mp4" width="100%" controls></video>
 
 ## 6. Setup & Usage Instructions
 
