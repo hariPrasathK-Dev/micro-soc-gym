@@ -6,11 +6,9 @@
 
 """Micro Soc Gym Environment."""
 
-from .client import MicroSocGymEnv
 from .models import MicroSocGymAction, MicroSocGymObservation
 
 __all__ = [
     "MicroSocGymAction",
     "MicroSocGymObservation",
-    "MicroSocGymEnv",
 ]

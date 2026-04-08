@@ -82,10 +82,6 @@ def main():
         elif "Scenario: hard" in inner_info:
             task_name = "hard"
 
-        # Skip hard scenario if disabled
-        if "disabled" in inner_info.lower():
-            continue
-
         # Emit [START] event
         print(f"[START] task={task_name} env={BENCHMARK} model={MODEL_NAME}", flush=True)
 

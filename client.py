@@ -58,13 +58,13 @@ class MicroSocGymClient:
     # ------------------------------------------------------------------
 
     def health(self) -> Dict[str, Any]:
-        """GET /health — confirm the server is up."""
+        """GET /health - confirm the server is up."""
         resp = self.session.get(f"{self.base_url}/health", timeout=self.timeout)
         resp.raise_for_status()
         return resp.json()
 
     def reset(self) -> Dict[str, Any]:
-        """POST /reset — start a new episode."""
+        """POST /reset - start a new episode."""
         resp = self.session.post(f"{self.base_url}/reset", timeout=self.timeout)
         resp.raise_for_status()
         return resp.json()
@@ -77,7 +77,7 @@ class MicroSocGymClient:
         pid: Optional[int] = None,
     ) -> Dict[str, Any]:
         """
-        POST /step — execute one agent action.
+        POST /step - execute one agent action.
 
         Args:
             tool:       One of "block_ip", "delete_file", "kill_process"
@@ -104,7 +104,7 @@ class MicroSocGymClient:
         return resp.json()
 
     def state(self) -> Dict[str, Any]:
-        """GET /state — current episode metadata."""
+        """GET /state - current episode metadata."""
         resp = self.session.get(f"{self.base_url}/state", timeout=self.timeout)
         resp.raise_for_status()
         return resp.json()
@@ -150,11 +150,11 @@ def _print_obs(obs: Dict[str, Any]) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Scenario demos — each returns final total_reward
+# Scenario demos - each returns final total_reward
 # ---------------------------------------------------------------------------
 
 def run_easy(client: MicroSocGymClient) -> float:
-    _banner("SCENARIO 1 / EASY — Noisy Scanner")
+    _banner("SCENARIO 1 / EASY - Noisy Scanner")
     print("  Expected action: block_ip(...) based on logs")
 
     obs = client.reset()
@@ -179,11 +179,11 @@ def run_easy(client: MicroSocGymClient) -> float:
 
 
 def run_medium(client: MicroSocGymClient) -> float:
-    _banner("SCENARIO 2 / MEDIUM — Stealthy Brute Force")
+    _banner("SCENARIO 2 / MEDIUM - Stealthy Brute Force")
     print("  Expected action: block_ip(...) (brute-force IP, not whitelisted admin)")
 
     obs = client.reset()
-    # Wait a bit extra — medium writes every 4s
+    # Wait a bit extra - medium writes every 4s
     print("  (waiting 5s for auth.log to populate…)")
     import time
     import re
@@ -208,7 +208,7 @@ def run_medium(client: MicroSocGymClient) -> float:
 
 
 def run_hard(client: MicroSocGymClient) -> float:
-    _banner("SCENARIO 3 / HARD — Active Webshell C2")
+    _banner("SCENARIO 3 / HARD - Active Webshell C2")
     print("  Expected actions: kill_process(<pid>)  +  delete_file('/var/www/html/backdoor.php')")
 
     obs = client.reset()
@@ -236,7 +236,7 @@ def run_hard(client: MicroSocGymClient) -> float:
         _print_obs(obs1)
         total += obs1.get("reward", 0.0)
     else:
-        print("  → No PID found in logs — skipping kill_process (hard scenario requires Linux /proc)")
+        print("  → No PID found in logs - skipping kill_process (hard scenario requires Linux /proc)")
 
     print("  → Sending: delete_file('/var/www/html/backdoor.php')")
     obs2 = client.step(tool="delete_file", file_path="/var/www/html/backdoor.php")
@@ -260,7 +260,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    print(f"\n🔐 Micro-SOC Gym — Demo Client")
+    print(f"\n🔐 Micro-SOC Gym - Demo Client")
     print(f"   Server: {args.url}\n")
 
     with MicroSocGymClient(base_url=args.url) as client:

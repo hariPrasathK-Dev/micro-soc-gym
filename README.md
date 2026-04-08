@@ -1,52 +1,55 @@
 ---
-title: Micro-SOC Gym
+title: Micro SOC Gym
 sdk: docker
 app_port: 7860
+tags:
+  - openenv
 ---
 
 <div align="center">
-  <img alt="Micro-SOC Gym" src="https://img.shields.io/badge/OpenEnv-Compatible-blue.svg">
-  <h1>Micro-SOC Gym</h1>
-  <p><strong>A Real-Time, Dockerized Security Operations Center (SOC) Triage Benchmark for Reinforcement Learning Agents.</strong></p>
+  <img alt="Micro SOC Gym" src="https://img.shields.io/badge/OpenEnv-Compatible-blue.svg">
+  <h1>Micro SOC Gym</h1>
+  <p><strong>A Real time, Docker-Based Benchmark for RL Agents in Security Operations Center (SOC) Triage</strong></p>
   <p>Built for the <b>Meta × Hugging Face × PyTorch OpenEnv Hackathon 2026</b>.</p>
+  <br>
 </div>
-
----
 
 ## Table of Contents
 
-- [1. Environment Description & Motivation](#1-environment-description--motivation)
-- [2. Observation & Action Space](#2-observation--action-space)
-- [3. Task Descriptions & Difficulty](#3-task-descriptions--difficulty)
-- [4. Baseline Evaluation & Inference Logs](#4-baseline-evaluation--inference-logs)
-- [5. Visual Workflow](#5-visual-workflow)
-- [6. Setup & Usage Instructions](#6-setup--usage-instructions)
-- [7. Project Architecture](#7-project-architecture)
-- [8. Pre-Validation Results](#8-pre-validation-results)
+1. [Environment Description & Motivation](#1-environment-description--motivation)
+2. [Observation & Action Space](#2-observation--action-space)
+3. [Task Descriptions & Difficulty](#3-task-descriptions--difficulty)
+4. [Baseline Evaluation & Inference Logs](#4-baseline-evaluation--inference-logs)
+5. [Visual Workflow](#5-visual-workflow)
+6. [Setup & Usage Instructions](#6-setup--usage-instructions)
+7. [System Architecture](#7-system-architecture)
+8. [Project Structure](#8-project-structure)
+9. [Pre-Validation Results](#9-pre-validation-results)
+10. [Team](#10-team)
 
----
 
 ## 1. Environment Description & Motivation
 
 ### Overview
 
-**Micro-SOC Gym** models a high-stakes, real-time Security Operations Center workload designed strictly for evaluating Reinforcement Learning (RL) agents and LLMs. Rather than interacting with static datasets or grid-world simulators, agents interface with a live, monolithic Docker container running production-grade services.
+**Micro SOC Gym** models a real time Security Operations Center (SOC) workload designed for evaluating Reinforcement Learning (RL) agents and LLMs. Rather than interacting with static datasets, agents interface with a real time, monolithic Docker container running production grade services.
 
-The environment provisions a FastAPI backend, simulated daemons (`nginx`, `sshd`), and orchestrated attacker scripts. Agents perform threat triage just like real analysts: by parsing unstructured server log streams, mapping threats, and executing exact remediation actions.
+The environment runs a FastAPI backend, simulated daemons (`nginx`, `sshd`), and orchestrated attacker scripts. Agents perform threat triage just like real analysts. It parses unstructured server log streams, maps threats and executes exact remediation actions.
 
 ### Motivation
 
-Standard LLM benchmarks test static multi-choice or simple generation capabilities. **Micro-SOC Gym** forces the agent into a proactive system administration role. It bridges the gap between cybersecurity and AI by heavily challenging an agent's ability to:
+In modern Security Operations Centers (SOCs), human analysts are generally overwhelmed by the volume of daily alerts. Because of this workload, anything that is not automated can slip through, leaving networks vulnerable. To safely automate this triage process, we need capable AI. This is why we chose to build Micro SOC Gym.
 
-1. Handle "noisy" data streams (identifying signal amidst decoy traffic).
-2. Sequentially build and execute a multi-tier remediation plan.
-3. Understand precise constraints to avoid _False Positives_—where overly aggressive actions cause catastrophic system failure by blocking legitimate network infrastructure.
+Standard LLM benchmarks test static multi-choice or simple generation capabilities. **Micro SOC Gym** forces the agent into a proactive system administration role. It challenges an agent's ability to:
 
----
+1. Handle noisy data streams (identifying signal amidst decoy traffic).
+2. Sequentially build and execute a remediation plan.
+3. Understand precise constraints to avoid _False Positives_ - where overly aggressive actions can cause system failures.
+
 
 ## 2. Observation & Action Space
 
-This environment conforms to the standard **OpenEnv** HTTP JSON schema patterns via integrated Pydantic definitions.
+This environment is based on the standard **OpenEnv** HTTP JSON schema patterns defined through integrated Pydantic definitions.
 
 ### 2.1 Observation Space
 
@@ -73,87 +76,81 @@ Instead of simple directional movements, the agent manipulates an infrastructure
 
 ## 3. Task Descriptions & Difficulty
 
-The environment sequences through tiered adversarial scenarios via a round-robin rotation upon iteration (`/reset`). Agents must shift strategies depending on the active threat intelligence.
+The environment runs each scenario via a round-robin rotation upon iteration (`/reset`). Agents must shift strategies and remediate based on the active threat.
 
-|  Difficulty   | Name & Mechanics                                                                                                                                                                            | Win Condition & Constraints                                                                                                                                                                                                                                          |
-| :-----------: | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-|  **🟢 Easy**  | **Volumetric Network Scanning**<br>A specific host originates a high frequency of `HTTP 404` errors traversing non-existent administrative endpoints (e.g., `/admin`, `/wp-login.php`).     | **Goal:** Parse `access.log` and invoke `block_ip(IP)`.<br>**Constraint:** Minimal. Rapid detection and blocking resolves the threat.                                                                                                                                |
-| **🟡 Medium** | **Identity Compromise & Subnet Decoys**<br>An attacker conducts sustained SSH credential stuffing attempts visible within `auth.log`. Legitimate admin logins intermingle.                  | **Goal:** Map the brute force IP and invoke `block_ip(IP)`.<br>**Constraint:** Extreme False-Positive penalty. Blocking the recognized admin subnet (`10.0.0.100`) triggers an immediate critical failure.                                                           |
-|  **🔴 Hard**  | **Active Command and Control (C2)**<br>A persistent threat has rooted the webserver via a PHP backdoor (`backdoor.php`) and actively dispatches base64-encoded shell commands to live PIDs. | **Goal:** Execute a multi-stage kill chain.<br>**Constraint:** Agents must first sever the session via `kill_process(PID)` _and_ sequentially invoke `delete_file(FILE)`. Neither action alone will stabilize the environment. _(Requires Unix/Linux process space)_ |
+| Difficulty | Name & Mechanics | Win Condition & Constraints |
+| :---: | :--- | :--- |
+| **Easy** | **Directory Brute Forcing**<br>A single IP is generating a massive amount of `HTTP 404` errors by brute forcing hidden admin pages (like `/admin` or `/wp-login.php`). | **Goal:** Find the malicious IP in `access.log` and call `block_ip(IP)`.<br>**Constraint:** None |
+| **Medium** | **SSH Brute Force**<br>An attacker is brute forcing the server with failed SSH login attempts (visible in `auth.log`), but legitimate admin traffic is happening at the exact same time. | **Goal:** Identify the attacker's IP and call `block_ip(IP)`.<br>**Constraint:** High false-positive penalty. If the agent accidentally blocks the legitimate admin subnet, it triggers an immediate failure. |
+| **Hard** | **Active C2 Backdoor**<br>An attacker has dropped a malicious file on the webserver and is actively sending base64-encoded commands to running processes. | **Goal:** Delete the backdoor and kill the malicious process.<br>**Constraint:** The agent must kill the active session using `kill_process(PID)` *and* remove the payload using `delete_file(FILE)`. Doing only one will not stop the attacker. |
 
----
 
-## 4. Baseline Evaluation & Inference Logs
+## 4. Inference & Results
 
-The environment is designed to rigorously evaluate LLM capabilities sequentially across varying difficulty tiers. As demonstrated below, a powerful instruction-tuned model (`Qwen/Qwen2.5-72B-Instruct`) was executed against the **Micro-SOC Gym** using the built-in ReAct `inference.py` harness.
+The environment tests models across progressively harder scenarios. Below is an evaluation run using the `Qwen/Qwen2.5-72B-Instruct` model via our built in ReAct script (`inference.py`). 
 
-The evaluation trace highlights the agent successfully parsing the underlying state and dispatching the exact appropriate API calls (`block_ip`, `delete_file`, `kill_process`) to achieve a perfect `3.00/3.00` cumulative score with precise, minimal-step interventions.
+The trace shows the agent successfully reading the environment state and calling the correct tools (`block_ip`, `delete_file`, `kill_process`). It achieves a perfect `3.00/3.00` score, resolving all the threats.
 
-![Inference Execution Trace demonstrating Qwen 72B resolving all tiered threats](inference.png)
+![Inference Results for Qwen 72B model](/media/inference.png)
 
----
 
 ## 5. Visual Workflow
 
-The following demonstration showcases the interactive **Gradio Telemetry Dashboard** hosted on Hugging Face Spaces. It provides a visual, real-time representation of the triage environment, allowing users to manually act as the responding agent. By analyzing live log streams and manually executing remediation tools, users can intuitively understand the environment's mechanics, active threat scenarios, and the precise constraints an AI agent must navigate.
+To help visualise the environment, we built an interactive Gradio Dashboard which is available at `http://localhost:7860/` when the docker container is run. 
+
+It lets you manually play the role of the responding agent. By reading the logs, triggering tools, and seeing how the environment scores your actions, you can easily understand the mechanics, constraints, and underlying reward logic the Agent has to learn.
 
 https://github.com/user-attachments/assets/d8978acb-e636-4ea6-9ece-084598976c6b
 
----
 
 ## 6. Setup & Usage Instructions
 
-### 6.1 Operating the Docker Monolith (Local/Deploy)
+### 6.1 Running the Docker Container
 
-Because the environment performs system-level state management, it executes flawlessly inside an isolated Hugging Face Docker Space or a local Unix deployment.
 
 ```bash
-# 1. Compile the self-contained container
+# 1. Build the Docker Image
 docker build -t micro-soc-gym .
 
-# 2. Deploy locally matching OpenEnv default ports
+# 2. Run the container
 docker run -p 7860:7860 micro-soc-gym
 ```
 
-**Bonus:** You can access the unified **Gradio Triage Dashboard** visually at `http://localhost:7860/` for manual testing and live-stream observation.
+**Note:** You can access the **Gradio Dashboard** at `http://localhost:7860/` for manual testing
 
-### 6.2 Scripted Agent Initialization
-
-To launch a programmatically controlled AI agent test loop against your running server:
+### 6.2 Run the Agent against all Scenarios
 
 ```bash
-# 1. Provision virtual environment and dependencies
+# 1. Create a virtual environment and install dependencies
 python -m venv .venv
 source .venv/bin/activate  # (Windows: .\.venv\Scripts\activate)
 pip install -r requirements.txt
 
-# 2. Map Hugging Face Hub Credentials
+# 2. Set Hugging Face Hub Credentials
 export HF_TOKEN="<your_secure_hugging_face_token>"
 
-# 3. Initiate Baseline Inference
+# 3. Run the Inference Script
 python inference.py
 ```
 
----
 
-## 7. Project Architecture
+## 7. System Architecture
 
-The codebase handles networking logic securely decoupled from kernel requirements via supervised orchestration.
+The codebase handles networking logic decoupled from kernel requirements via a supervised orchestration.
 
-### 7.1 System Architecture Diagram
 
 ```text
 +-------------------------------------------------------------+
 |                     OpenEnv Framework                       |
 |  +-----------------+                 +-------------------+  |
-|  |   RL Agent/LLM  |  <---JSON--->   |   inference.py    |  |
-|  | (Qwen/Baseline) |                 | (OpenEnv harness) |  |
+|  |     RL Agent    |  <---JSON--->   |   inference.py    |  |
+|  |      (Qwen)     |                 | (OpenEnv harness) |  |
 |  +-----------------+                 +-------------------+  |
 +-------------------------------------------------------------+
                                | (HTTP/REST via Port 7860)
                                v
 +-------------------------------------------------------------+
-|                 Docker Container (Micro-SOC)                |
+|                 Docker Container (Micro SOC)                |
 |                                                             |
 |  +=======================================================+  |
 |  |                   Supervisord (Init)                  |  |
@@ -174,41 +171,49 @@ The codebase handles networking logic securely decoupled from kernel requirement
 |  |                 Micro SOC Gym Environment             |  |
 |  |                                                       |  |
 |  |  +----------------+  +--------------+  +-----------+  |  |
-|  |  | Log Aggregator |  | Rules/Grader |  | Telemetry |  |  |
+|  |  | Log Aggregator |  | Rules/Grader |  | Dashboard |  |  |
 |  |  | (access/auth)  |  |    Engine    |  | (Gradio)  |  |  |
 |  |  +----------------+  +--------------+  +-----------+  |  |
 |  +=======================================================+  |
 +-------------------------------------------------------------+
 ```
 
-### 7.2 Directory Structure
+## 8. Project Structure
 
 ```text
 micro_soc_gym/
-├── openenv.yaml                      # OpenEnv space requirement configuration
-├── schema.json                       # Validation schema for standard OpenEnv JSON interactions
-├── Dockerfile                        # Environment runtime manifest & OS provisions
-├── supervisord.conf                  # Daemon management orchestrator (Nginx, API, Attacks)
-├── nginx-default                     # Nginx server configuration defaults and simulated routing
-├── pyproject.toml / requirements.txt # Python dependencies map and package configuration
-├── validate-submission.sh            # Local strict validation helper script
-├── server/                           # OpenEnv Backend Services
-│   ├── app.py                        # FastAPI endpoints and Gradio Telemetry Dashboard
-│   └── micro_soc_gym_environment.py  # Primary orchestration, grader matrix, and rules engines
+├── .github/
+│   └── workflows/
+│       └── sync-to-hf.yml            # GitHub Actions workflow to sync repo to Hugging Face Space
+├── media/                            # Static assets for documentation
 ├── scripts/                          # Subprocess Attack Generators
 │   ├── easy_attack.sh                # Volumetric target traffic creator
 │   ├── medium_attack.sh              # Mock SSH Brute-Force + Decoys
 │   └── hard_attack.sh                # Webshell runtime process simulation
-├── inference.py                      # Automated LLM ReAct agent testing loop
+├── server/                           # OpenEnv Backend Services
+│   ├── __init__.py                   # Package initializer
+│   ├── app.py                        # FastAPI endpoints and Gradio Telemetry Dashboard
+│   └── micro_soc_gym_environment.py  # Primary orchestration, grader matrix, and rules engines
+├── __init__.py                       # Package initializer
 ├── client.py                         # Synchronous HTTP validation client
-└── models.py                         # Application-layer Pydantic schema exports
+├── Dockerfile                        # Environment runtime manifest & OS provisions
+├── inference.py                      # Automated LLM ReAct agent testing loop
+├── models.py                         # Application-layer Pydantic schema exports
+├── nginx-default                     # Nginx server configuration defaults and simulated routing
+├── openenv.yaml                      # OpenEnv space requirement configuration
+├── pyproject.toml                    # Python package configuration
+├── requirements.txt                  # Python dependencies
+├── schema.json                       # Validation schema for standard OpenEnv JSON interactions
+├── supervisord.conf                  # Daemon management orchestrator (Nginx, API, Attacks)
+├── uv.lock                           # Locked dependency versions (uv)
+└── validate-submission.sh            # Local strict validation helper script
 ```
 
-## 8. Pre-Validation Results
+## 9. Pre-Validation Results
 
-Prior to deployment, the environment underwent strict automated compliance testing using the official OpenEnv validation suite. All requisite checks—including Hugging Face Space liveness, Docker container build integrity, and OpenEnv schema validation—passed successfully.
+Before deploying, we ran the environment through the given Pre-Validation Script. Everything passed, including the Docker build, Hugging Face Space liveness, and schema checks.
 
-![OpenEnv Pre-Validation Success Output](pre-validation.png)
+![OpenEnv Pre-Validation Success Output](/media/pre-validation.png)
 
 <details>
 <summary><b>View Raw Validation Logs</b></summary>
@@ -237,3 +242,11 @@ Prior to deployment, the environment underwent strict automated compliance testi
 ```
 
 </details>
+
+## Team
+
+| Name                   | GitHub ID                                               |
+|------------------------|---------------------------------------------------------|
+| Harinie CB             | [harinie-4466](https://github.com/harinie-4466)         |
+| Hari Prasath K         | [hariPrasathK-Dev](https://github.com/hariPrasathK-Dev) |
+| Adithya Menon R        | [adithya-menon-r](https://github.com/adithya-menon-r)   |
