@@ -14,29 +14,33 @@ jobs:
           fetch-depth: 1
           lfs: true
           
-      - name: Build clean history and push to Hugging Face
+      - name: Sync to Hugging Face Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          # 1. Delete the GitHub git history
-          rm -rf .git
+          # 1. Clone the Hugging Face Space into a folder called 'hf_space'
+          git clone https://harinie4466:$HF_TOKEN@huggingface.co/spaces/harinie4466/micro-soc-gym hf_space
           
-          # 2. Start a fresh, clean git repository just for this deployment
-          git init -b main
+          # 2. Use rsync to copy all GitHub files into the HF folder.
+          # The --exclude flags ensure media files and github workflows are left behind.
+          rsync -av --delete \
+            --exclude='.git/' \
+            --exclude='.github/' \
+            --exclude='*.mp4' \
+            --exclude='*.png' \
+            --exclude='*.jpg' \
+            --exclude='*.jpeg' \
+            --exclude='hf_space/' \
+            ./ hf_space/
+          
+          # 3. Enter the HF folder, commit the changes, and do a NORMAL push
+          cd hf_space
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
           
-          # 3. Add all current files
           git add .
+          # The '|| true' prevents the action from failing if no files were changed
+          git commit -m "Sync from GitHub (excluding media)" || true
           
-          # 4. Explicitly UNTRACK videos AND images
-          find . -name "*.mp4" -type f -exec git rm --cached {} + || true
-          find . -name "*.png" -type f -exec git rm --cached {} + || true
-          find . -name "*.jpg" -type f -exec git rm --cached {} + || true
-          find . -name "*.jpeg" -type f -exec git rm --cached {} + || true
-          
-          # 5. Make a single clean commit without media files
-          git commit -m "Deploy to Hugging Face (excluding media files)"
-          
-          # 6. Force push this clean slate to Hugging Face
-          git push --force https://harinie4466:$HF_TOKEN@huggingface.co/spaces/harinie4466/micro-soc-gym main
+          # Push normally without the --force flag!
+          git push https://harinie4466:$HF_TOKEN@huggingface.co/spaces/harinie4466/micro-soc-gym main
