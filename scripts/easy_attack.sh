@@ -3,15 +3,13 @@
 
 if [ -f /tmp/micro_soc_state.env ]; then
     source /tmp/micro_soc_state.env
-    ATTACKER_IP=$EASY_ATTACKER_IP
 else
     ATTACKER_IP="$((RANDOM % 255 + 1)).$((RANDOM % 255)).$((RANDOM % 255)).$((RANDOM % 255))"
-    EASY_NORMAL_IPS=("$((RANDOM % 255 + 1)).$((RANDOM % 255)).$((RANDOM % 255)).$((RANDOM % 255))" "$((RANDOM % 255 + 1)).$((RANDOM % 255)).$((RANDOM % 255)).$((RANDOM % 255))")
+    NORMAL_IPS=("$((RANDOM % 255 + 1)).$((RANDOM % 255)).$((RANDOM % 255)).$((RANDOM % 255))" "$((RANDOM % 255 + 1)).$((RANDOM % 255)).$((RANDOM % 255)).$((RANDOM % 255))")
 fi
 
-NORMAL_IPS=("${EASY_NORMAL_IPS[@]}")
-NORMAL_PATHS=("/" "/index.html" "/about" "/contact" "/products" "/favicon.ico")
 COUNTER=0
+NORMAL_PATHS=("/" "/index.html" "/about" "/contact" "/products" "/favicon.ico")
 
 echo "Starting easy scenario attack..."
 
