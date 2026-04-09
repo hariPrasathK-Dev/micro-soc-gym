@@ -13,34 +13,20 @@ jobs:
         with:
           fetch-depth: 1
           lfs: true
-          
+
       - name: Sync to Hugging Face Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          # 1. Clone the Hugging Face Space into a folder called 'hf_space'
-          git clone https://harinie4466:$HF_TOKEN@huggingface.co/spaces/harinie4466/micro-soc-gym hf_space
-          
-          # 2. Use rsync to copy all GitHub files into the HF folder.
-          # The --exclude flags ensure media files and github workflows are left behind.
-          rsync -av --delete \
-            --exclude='.git/' \
-            --exclude='.github/' \
-            --exclude='*.mp4' \
-            --exclude='*.png' \
-            --exclude='*.jpg' \
-            --exclude='*.jpeg' \
-            --exclude='hf_space/' \
-            ./ hf_space/
-          
-          # 3. Enter the HF folder, commit the changes, and do a NORMAL push
-          cd hf_space
+          git archive HEAD | tar -x -C /tmp/hf_export
+
+          cd /tmp/hf_export
+          git init
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
-          
+          git remote add hf https://harinie4466:$HF_TOKEN@huggingface.co/spaces/harinie4466/micro-soc-gym
+
           git add .
-          # The '|| true' prevents the action from failing if no files were changed
-          git commit -m "Sync from GitHub (excluding media)" || true
-          
-          # Push normally without the --force flag!
-          git push https://harinie4466:$HF_TOKEN@huggingface.co/spaces/harinie4466/micro-soc-gym main
+          git commit -m "Sync from GitHub (excluding media)"
+
+          git push hf HEAD:main --force

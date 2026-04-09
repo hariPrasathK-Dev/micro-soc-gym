@@ -1,0 +1,5 @@
+*.mp4    export-ignore
+*.png    export-ignore
+*.jpg    export-ignore
+*.jpeg   export-ignore
+.github/ export-ignore
