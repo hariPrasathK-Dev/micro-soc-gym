@@ -355,7 +355,7 @@ def build_gradio_ui() -> gr.Blocks:
         <div style="text-align:center;padding:32px 0 12px;">
           <h1 class="soc-title">Micro-SOC Gym</h1>
           <p style="color:#64748b;font-size:0.95rem;font-family:monospace;margin:0 0 20px;">
-            RL environment simulating a Security Operations Center (SOC) triage engine.
+            RL environment simulating a Security Operations Center (SOC) Triage Engine.
           </p>
         </div>
         """)
@@ -489,7 +489,7 @@ def build_gradio_ui() -> gr.Blocks:
                       <td style="padding:8px 12px;color:#ef4444;font-weight:700;">Hard</td>
                       <td style="padding:8px 12px;color:#e2e8f0;">access.log</td>
                       <td style="padding:8px 12px;color:#e2e8f0;">random backdoor C2 file from random IP</td>
-                      <td style="padding:8px 12px;color:#38bdf8;">kill_process(PID)<br>delete_file("/var/www/html/&lt;backdoor_name&gt;")</td>
+                      <td style="padding:8px 12px;color:#38bdf8;">kill_process(PID)<br>delete_file("&lt;backdoor_name&gt;")</td>
                       <td style="padding:8px 12px;text-align:right;color:#22c55e;">+1.0</td>
                     </tr>
                   </tbody>
