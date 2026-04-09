@@ -18,6 +18,7 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
+          mkdir -p /tmp/hf_export
           git archive HEAD | tar -x -C /tmp/hf_export
 
           cd /tmp/hf_export
