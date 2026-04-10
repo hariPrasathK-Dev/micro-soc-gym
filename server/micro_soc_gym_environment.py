@@ -282,6 +282,16 @@ class MicroSocGymEnvironment(Environment):
             f"Blocked {ip}, but that is not the attacker. Re-check the logs.",
         )
 
+    def _get_hard_scenario_hint(self, backdoor_exists: bool, process_alive: bool, ip_blocked: bool) -> str:
+        hints = []
+        if not ip_blocked:
+            hints.append("suspicious external traffic is still being received")
+        if backdoor_exists:
+            hints.append("an unauthorized file is still present in the web root")
+        if process_alive:
+            hints.append("anomalous outbound requests are still being generated from the server")
+        return "Threat still active: " + "; ".join(hints) + ". Re-examine your observations."
+
     def _calculate_reward_hard(self, action: MicroSocGymAction):
         backdoor_path = os.path.join(WEBROOT_PATH, self.backdoor_file_name)
         backdoor_exists = os.path.exists(backdoor_path)
@@ -300,15 +310,19 @@ class MicroSocGymEnvironment(Environment):
             if ip == self.attacker_ip:
                 block_ip(ip)
 
+                process_alive = check_hard_attack_process()
                 done = (
                     not os.path.exists(backdoor_path)
-                    and not check_hard_attack_process()
+                    and not process_alive
+                )
+                hint = self._get_hard_scenario_hint(
+                    os.path.exists(backdoor_path), process_alive, True
                 )
                 return (
                     CORRECT_ACTION_REWARD,
                     done,
                     done,
-                    f"CORRECT! Attacker IP - {ip} is blocked. {'Threat neutralised.' if done else 'Threat still active, check for other indicators of compromise and choose the right action.'}",
+                    f"CORRECT! Attacker IP - {ip} is blocked. {'Threat neutralised.' if done else hint}",
                 )
 
             return (
@@ -332,15 +346,18 @@ class MicroSocGymEnvironment(Environment):
             killed = kill_process(pid)
 
             if killed:
-                if not check_hard_attack_process():
-                    done = not os.path.exists(backdoor_path) and is_ip_blocked(
-                        self.attacker_ip
+                process_alive = check_hard_attack_process()
+                if not process_alive:
+                    ip_blocked = is_ip_blocked(self.attacker_ip)
+                    done = not os.path.exists(backdoor_path) and ip_blocked
+                    hint = self._get_hard_scenario_hint(
+                        os.path.exists(backdoor_path), False, ip_blocked
                     )
                     return (
                         CORRECT_ACTION_REWARD,
                         done,
                         done,
-                        f"CORRECT! PID {pid} is killed. {'Threat neutralised.' if done else 'Threat still active, check for other indicators of compromise and choose the right action.'}",
+                        f"CORRECT! PID {pid} is killed. {'Threat neutralised.' if done else hint}",
                     )
                 else:
                     return (
@@ -364,15 +381,19 @@ class MicroSocGymEnvironment(Environment):
                 os.remove(backdoor_path)
                 self._file_deleted = True
 
-                done = not check_hard_attack_process() and is_ip_blocked(
-                    self.attacker_ip
+                process_alive = check_hard_attack_process()
+                ip_blocked = is_ip_blocked(self.attacker_ip)
+                done = not process_alive and ip_blocked
+                
+                hint = self._get_hard_scenario_hint(
+                    False, process_alive, ip_blocked
                 )
 
                 return (
                     CORRECT_ACTION_REWARD,
                     done,
                     done,
-                    f"CORRECT! Backdoor file {path} deleted. {'Threat neutralised.' if done else 'Threat still active, check for other indicators of compromise and choose the right action.'}",
+                    f"CORRECT! Backdoor file {path} deleted. {'Threat neutralised.' if done else hint}",
                 )
             elif not backdoor_exists and path == backdoor_path:
                 return (
