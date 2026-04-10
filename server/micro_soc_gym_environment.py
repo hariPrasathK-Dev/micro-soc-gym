@@ -116,11 +116,19 @@ class MicroSocGymEnvironment(Environment):
 
         time.sleep(3)
 
+        alert = "Alert: A threat has been detected. Analyse and neutralise the threat."
+        if scenario == "easy":
+            alert = "Alert: External monitoring has detected an unusual spike in HTTP traffic and bandwidth consumption on the primary web server. Analyse and neutralise the root cause."
+        elif scenario == "medium":
+            alert = "Alert: Endpoint detection has flagged an anomalous pattern of authentication events and minor CPU spikes tied to remote access services. Analyse and neutralise the root cause."
+        elif scenario == "hard":
+            alert = "Alert: Network monitors have detected persistent, suspicious traffic originating from within the web application itself. Analyse and neutralise the root cause."
+
         return MicroSocGymObservation(
             reward=0.0,
             done=False,
             success=False,
-            info=f"Episode started. A threat has been detected. Analyse the logs and neutralise the threat.",
+            info=f"Episode started. {alert}",
         )
 
     def step(self, action: MicroSocGymAction) -> MicroSocGymObservation:

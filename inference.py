@@ -73,6 +73,10 @@ def main():
         action_history: List[str] = []
         done = obs.get("done", False)
         success = obs.get("observation", {}).get("success", False)
+        
+        initial_info = obs.get("observation", {}).get("info", "")
+        if initial_info:
+            action_history.append(f"Step 0: {initial_info}")
 
         while not done and step_idx < MAX_STEPS:
             step_idx += 1
@@ -169,8 +173,11 @@ def main():
                 action_str.replace("\n", "").replace("\r", "") if action_str else "{}"
             )
 
+            is_action_read_log = '"read_' in action_log
+            info_prefix = "Information:\n" if is_action_read_log else "Feedback: "
+
             action_history.append(
-                f"Step {step_idx}: Action: {action_log} -> Reward: {reward:.2f} | Information: {inner_info}"
+                f"Step {step_idx}: Action: {action_log} -> Reward: {reward:.2f} | {info_prefix}{inner_info}"
             )
 
             print(
