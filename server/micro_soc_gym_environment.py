@@ -165,6 +165,13 @@ class MicroSocGymEnvironment(Environment):
             self._used_tools = set()
 
         if action.tool in ("read_access_log", "read_auth_log"):
+            if action.tool in self._used_tools:
+                return (
+                    WRONG_TOOL_PENALTY,
+                    False,
+                    False,
+                    "Logs are unchanged. You have already investigated and read the logs. Focus on what the system is still doing.",
+                )
             remediation_tools = {"block_ip", "delete_file", "kill_process"}
             if remediation_tools.issubset(self._used_tools):
                 self._used_tools.add(action.tool)
@@ -302,6 +309,9 @@ class MicroSocGymEnvironment(Environment):
     def _get_hard_scenario_hint(
         self, backdoor_exists: bool, process_alive: bool, ip_blocked: bool
     ) -> str:
+        if not backdoor_exists and ip_blocked and process_alive:
+            return f"IP blocked and backdoor removed. However, requests to /{self.backdoor_file_name} are still being generated from within the server itself. Investigate the source."
+
         hints = []
         if not ip_blocked:
             hints.append("suspicious external traffic is still being received")
@@ -313,7 +323,7 @@ class MicroSocGymEnvironment(Environment):
             )
         return (
             "Threat still active: "
-            + "; ".join(hints)
+            + ", ".join(hints)
             + ". Re-examine your observations."
         )
 
