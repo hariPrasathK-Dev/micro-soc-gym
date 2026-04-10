@@ -559,13 +559,12 @@ def build_gradio_ui() -> gr.Blocks:
     return demo
 
 
-# Mount Gradio onto the FastAPI app
-gradio_ui = build_gradio_ui()
-app = gr.mount_gradio_app(app, gradio_ui, path="/")
-
 @app.get("/grade_episode")
 def grade_episode(scenario: str) -> float:
     return _env_singleton.grade_episode(scenario)
+
+gradio_ui = build_gradio_ui()
+app = gr.mount_gradio_app(app, gradio_ui, path="/")
 
 def main():
     import uvicorn

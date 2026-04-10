@@ -177,7 +177,7 @@ class MicroSocGymEnvironment(Environment):
                     reward,
                     False,
                     False,
-                    f"Wrong logfile accessed.\nAccess Log:\n{logs}",
+                    f"Wrong logfile accessed.",
                 )
 
         if action.tool == "read_auth_log":
@@ -193,7 +193,7 @@ class MicroSocGymEnvironment(Environment):
                     reward,
                     False,
                     False,
-                    f"Wrong logfile accessed.\nAuth Log:\n{logs}",
+                    f"Wrong logfile accessed.",
                 )
 
         if not self._state.investigated:
