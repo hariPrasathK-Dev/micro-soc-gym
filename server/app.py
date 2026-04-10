@@ -563,6 +563,9 @@ def build_gradio_ui() -> gr.Blocks:
 gradio_ui = build_gradio_ui()
 app = gr.mount_gradio_app(app, gradio_ui, path="/")
 
+@app.get("/grade_episode")
+def grade_episode(scenario: str) -> float:
+    return _env_singleton.grade_episode(scenario)
 
 def main():
     import uvicorn

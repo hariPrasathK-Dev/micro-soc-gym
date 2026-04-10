@@ -62,6 +62,15 @@ class MicroSocGymClient:
         resp.raise_for_status()
         return resp.json()
 
+    def grade_episode(self, scenario: str) -> float:
+        resp = self.session.get(
+            f"{self.base_url}/grade_episode",
+            params={"scenario": scenario},
+            timeout=self.timeout
+        )
+        resp.raise_for_status()
+        return float(resp.json())
+
     def close(self) -> None:
         self.session.close()
 
