@@ -36,8 +36,8 @@ except ImportError as e:
         "gradio is required for the web UI. Add 'gradio' to dependencies."
     ) from e
 
-from ..models import MicroSocGymAction, MicroSocGymObservation
-from .micro_soc_gym_environment import MicroSocGymEnvironment
+from models import MicroSocGymAction, MicroSocGymObservation
+from server.micro_soc_gym_environment import MicroSocGymEnvironment
 
 # ---------------------------------------------------------------------------
 # Singleton environment - shared between OpenEnv HTTP API and Gradio UI

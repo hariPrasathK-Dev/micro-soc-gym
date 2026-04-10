@@ -4,6 +4,6 @@
 # This source code is licensed under the BSD-style license found in the
 # LICENSE file in the root directory of this source tree.
 
-from .micro_soc_gym_environment import MicroSocGymEnvironment
+from server.micro_soc_gym_environment import MicroSocGymEnvironment
 
 __all__ = ["MicroSocGymEnvironment"]

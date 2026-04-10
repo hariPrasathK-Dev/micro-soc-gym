@@ -11,8 +11,8 @@ import random
 
 from openenv.core.env_server import Environment
 
-from ..models import MicroSocGymAction, MicroSocGymObservation, MicroSocGymState
-from .constants import (
+from models import MicroSocGymAction, MicroSocGymObservation, MicroSocGymState
+from server.constants import (
     SCENARIOS,
     ACCESS_LOG_PATH,
     AUTH_LOG_PATH,
@@ -25,7 +25,7 @@ from .constants import (
     FATAL_ACTION_PENALTY,
     WRONG_TOOL_PENALTY,
 )
-from .utils import (
+from server.utils import (
     clear_file,
     nginx_reload,
     kill_process,

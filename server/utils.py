@@ -1,9 +1,8 @@
 import os
-import sys
 import time
 import subprocess
 import random
-from .constants import BLOCKLIST_PATH
+from server.constants import IP_BLOCKLIST_PATH
 
 
 def random_ip():
@@ -27,7 +26,7 @@ def nginx_reload() -> None:
 
 def block_ip(ip: str) -> None:
     try:
-        with open(BLOCKLIST_PATH, "a") as f:
+        with open(IP_BLOCKLIST_PATH, "a") as f:
             f.write(f"deny {ip};\n")
         nginx_reload()
     except Exception:
@@ -36,7 +35,7 @@ def block_ip(ip: str) -> None:
 
 def is_ip_blocked(ip: str) -> bool:
     try:
-        with open(BLOCKLIST_PATH, "r") as f:
+        with open(IP_BLOCKLIST_PATH, "r") as f:
             return f"deny {ip};" in f.read()
     except Exception:
         return False
