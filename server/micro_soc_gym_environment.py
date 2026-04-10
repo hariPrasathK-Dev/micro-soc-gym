@@ -109,6 +109,7 @@ class MicroSocGymEnvironment(Environment):
         )
 
         self._last_tool = None
+        self._used_tools = set()
 
         self._clear_previous_environment()
         self._generate_scenario_attack_properties(scenario)
@@ -159,6 +160,22 @@ class MicroSocGymEnvironment(Environment):
     def _calculate_reward(self, action: MicroSocGymAction, scenario: str):
         last_tool = getattr(self, "_last_tool", None)
         self._last_tool = action.tool
+
+        if not hasattr(self, "_used_tools"):
+            self._used_tools = set()
+
+        if action.tool in ("read_access_log", "read_auth_log"):
+            remediation_tools = {"block_ip", "delete_file", "kill_process"}
+            if remediation_tools.issubset(self._used_tools):
+                self._used_tools.add(action.tool)
+                return (
+                    WRONG_TOOL_PENALTY,
+                    False,
+                    False,
+                    "You have already investigated and attempted remediation. Focus on what the system is still doing.",
+                )
+
+        self._used_tools.add(action.tool)
 
         if action.tool == "read_access_log":
             self._state.investigated = True
@@ -282,15 +299,23 @@ class MicroSocGymEnvironment(Environment):
             f"Blocked {ip}, but that is not the attacker. Re-check the logs.",
         )
 
-    def _get_hard_scenario_hint(self, backdoor_exists: bool, process_alive: bool, ip_blocked: bool) -> str:
+    def _get_hard_scenario_hint(
+        self, backdoor_exists: bool, process_alive: bool, ip_blocked: bool
+    ) -> str:
         hints = []
         if not ip_blocked:
             hints.append("suspicious external traffic is still being received")
         if backdoor_exists:
             hints.append("an unauthorized file is still present in the web root")
         if process_alive:
-            hints.append("anomalous outbound requests are still being generated from the server")
-        return "Threat still active: " + "; ".join(hints) + ". Re-examine your observations."
+            hints.append(
+                "anomalous outbound requests are still being generated from the server"
+            )
+        return (
+            "Threat still active: "
+            + "; ".join(hints)
+            + ". Re-examine your observations."
+        )
 
     def _calculate_reward_hard(self, action: MicroSocGymAction):
         backdoor_path = os.path.join(WEBROOT_PATH, self.backdoor_file_name)
@@ -311,10 +336,7 @@ class MicroSocGymEnvironment(Environment):
                 block_ip(ip)
 
                 process_alive = check_hard_attack_process()
-                done = (
-                    not os.path.exists(backdoor_path)
-                    and not process_alive
-                )
+                done = not os.path.exists(backdoor_path) and not process_alive
                 hint = self._get_hard_scenario_hint(
                     os.path.exists(backdoor_path), process_alive, True
                 )
@@ -384,10 +406,8 @@ class MicroSocGymEnvironment(Environment):
                 process_alive = check_hard_attack_process()
                 ip_blocked = is_ip_blocked(self.attacker_ip)
                 done = not process_alive and ip_blocked
-                
-                hint = self._get_hard_scenario_hint(
-                    False, process_alive, ip_blocked
-                )
+
+                hint = self._get_hard_scenario_hint(False, process_alive, ip_blocked)
 
                 return (
                     CORRECT_ACTION_REWARD,

@@ -66,7 +66,7 @@ class MicroSocGymClient:
         resp = self.session.get(
             f"{self.base_url}/grade_episode",
             params={"scenario": scenario},
-            timeout=self.timeout
+            timeout=self.timeout,
         )
         resp.raise_for_status()
         return float(resp.json())

@@ -73,7 +73,7 @@ def main():
         action_history: List[str] = []
         done = obs.get("done", False)
         success = obs.get("observation", {}).get("success", False)
-        
+
         initial_info = obs.get("observation", {}).get("info", "")
         if initial_info:
             action_history.append(f"Step 0: {initial_info}")
