@@ -12,6 +12,7 @@ import random
 from openenv.core.env_server import Environment
 
 from models import MicroSocGymAction, MicroSocGymObservation, MicroSocGymState
+
 from server.constants import (
     SCENARIOS,
     ACCESS_LOG_PATH,
@@ -23,10 +24,17 @@ from server.constants import (
     PID_FILE_PATH,
     MAX_STEPS,
     CORRECT_ACTION_REWARD,
-    PARTIAL_ACTION_REWARD,
-    FATAL_ACTION_PENALTY,
+    CORRECT_INVESTIGATIVE_DIRECTION_REWARD,
+    CORRECT_TOOL_WRONG_TARGET_REWARD,
+    NON_INVESTIGATIVE_REMEDIATION_ACTION_PENALTY,
+    ADMIN_IP_BLOCK_PENALTY,
+    WRONG_FILE_DELETION_PENALTY,
     WRONG_TOOL_PENALTY,
+    UNWARRANTED_ACTION_REPEAT_PENALTY,
+    ACTION_TO_STALL_PENALTY,
+    PROCESS_KILL_FAIL_PENALTY,
 )
+
 from server.utils import (
     clear_file,
     nginx_reload,
@@ -131,8 +139,7 @@ class MicroSocGymEnvironment(Environment):
             investigated=False,
         )
 
-        self._last_tool = None
-        self._used_tools = set()
+        self._used_tools = set() # Create set to track used tools in the episode
 
         # Clears the environment, generates the attack properties for the scenario and starts the attack
         self._clear_previous_environment()
@@ -194,9 +201,6 @@ class MicroSocGymEnvironment(Environment):
     # The only part that gave me a logical headache while building the whole thing
     # So many edge cases and ways agent tries to beat the system (impressive work by the model lol...)
     def _calculate_reward(self, action: MicroSocGymAction, scenario: str):
-        last_tool = getattr(self, "_last_tool", None)
-        self._last_tool = action.tool # Updates the _last_tool
-
         if not hasattr(self, "_used_tools"):
             self._used_tools = set() # Creates the _used_tools set to keep track of tools used in the episode
 
@@ -204,25 +208,25 @@ class MicroSocGymEnvironment(Environment):
             # If the agent tries reading the same log file again, penalty given as it's and attempt to game the system
             # Agent re reading same logs consecutively like read_access_log, read_access_log,... is handled later below
             # But agent then decided to read_access_log, read_auth_log, read_access_log, read_auth_log..... (lowkey clever)
-            # So this prevents the agent from re-reading logs by penalising it (WRONG_TOOL_PENALTY)
+            # So this prevents the agent from re-reading logs by penalising it (UNWARRANTED_ACTION_REPEAT_PENALTY)
             # But what if the agent needs logs for context for taking multiple steps?
             # Well, action_history which is passed to the agent every time will contain the logs from the first read, so it can use that as context for the scenario
             if action.tool in self._used_tools:
                 return (
-                    WRONG_TOOL_PENALTY,
+                    UNWARRANTED_ACTION_REPEAT_PENALTY,
                     False,
                     False,
                     "Logs are unchanged. You have already investigated and read the logs. Focus on what the system is still doing.",
                 )
             
-            # If the agent tries reaidng a different logfile after executing all remediation actions atleast once
+            # If the agent tries reading a different logfile after executing all remediation actions atleast once
             # This is basically the agent stalling as it already has all the information it needs, and is executing the remediation actions incorrectly 
-            # So agent is penalised with WRONG_TOOL_PENALTY 
+            # So agent is penalised with ACTION_TO_STALL_PENALTY 
             remediation_tools = {"block_ip", "delete_file", "kill_process"}
             if remediation_tools.issubset(self._used_tools): # If all the remediation tools are in the used tools set
                 self._used_tools.add(action.tool)
                 return (
-                    WRONG_TOOL_PENALTY,
+                    ACTION_TO_STALL_PENALTY,
                     False,
                     False,
                     "You have already investigated and attempted remediation. Focus on what the system is still doing.",
@@ -237,16 +241,12 @@ class MicroSocGymEnvironment(Environment):
 
             # Easy and hard scenarios needs access log to investigate the attack, not auth log 
             if scenario in ["easy", "hard"]:
-                 # If the immediate previous tool was the same, then 0 reward is given, else its the correct action
-                 # This prevents gaming the system by just reading the same logfile again and again to rack up rewards without neutralising the threat
-                 # Discovered when agent kept reading same logs to up the rewards until episode expired
-                reward = (0.0 if last_tool == "read_access_log" else CORRECT_ACTION_REWARD)
-                return reward, False, False, f"Here are the Access Logs:\n{logs}"
+                 # Since its the correct action, CORRECT_ACTION_REWARD is given
+                return CORRECT_ACTION_REWARD, False, False, f"Here are the Access Logs:\n{logs}"
             else:
                 # Partial reward as wrong logfile chosen but direction of investigation is correct
-                reward = (0.0 if last_tool == "read_access_log" else PARTIAL_ACTION_REWARD)
                 return (
-                    reward,
+                    CORRECT_INVESTIGATIVE_DIRECTION_REWARD,
                     False,
                     False,
                     f"Wrong logfile accessed.",
@@ -259,28 +259,25 @@ class MicroSocGymEnvironment(Environment):
 
             # Medium scenario needs the auth log to investigate the attack, not access log
             if scenario == "medium":
-                # If the immediate previous tool was the same, then 0 reward is given, else its the correct action
-                # This prevents gaming the system by just reading the same logfile again and again to rack up
-                # Discovered when agent kept reading same logs to up the rewards until episode expired
-                reward = 0.0 if last_tool == "read_auth_log" else CORRECT_ACTION_REWARD
-                return reward, False, False, f"Here are the Auth Logs:\n{logs}"
+                # Since its the correct action, CORRECT_ACTION_REWARD is given
+                return CORRECT_ACTION_REWARD, False, False, f"Here are the Auth Logs:\n{logs}"
             else:
                 # Partial reward as wrong logfile chosen but direction of investigation is correct
-                reward = 0.0 if last_tool == "read_auth_log" else PARTIAL_ACTION_REWARD
                 return (
-                    reward,
+                    CORRECT_INVESTIGATIVE_DIRECTION_REWARD,
                     False,
                     False,
                     f"Wrong logfile accessed.",
                 )
 
-        # Penalise the agent for trying to wing it by executing a remediation action without ever investigating the alert
+        # Penalise the agent for executing a remediation action without ever investigating the alert
+        # Agent will just try to wing through the whole episode, hence no point continuing...
         if not self._state.investigated:
             return (
-                WRONG_TOOL_PENALTY,
+                NON_INVESTIGATIVE_REMEDIATION_ACTION_PENALTY,
+                True,
                 False,
-                False,
-                "You must investigate the logs first before taking remediation actions.",
+                "Episode FAILED! You must investigate the logs first before taking remediation actions.",
             )
 
         # Calculating the reward for the agent based on the action and the scenario
@@ -325,10 +322,10 @@ class MicroSocGymEnvironment(Environment):
                 f"CORRECT! Attacker IP - {ip} is blocked. Threat neutralised.",
             )
 
-        # If block_ip tool is used but the IP blocked is not the attacker IP, then PARTIAL_ACTION_REWARD is given
+        # If block_ip tool is used but the IP blocked is not the attacker IP, then CORRECT_TOOL_WRONG_TARGET_REWARD is given
         # Tool choice is correct but wrong IP is blocked, so feedback is given accordingly
         return (
-            PARTIAL_ACTION_REWARD,
+            CORRECT_TOOL_WRONG_TARGET_REWARD,
             False,
             False,
             f"Blocked {ip}, but that is not the attacker. Re-check the logs.",
@@ -348,13 +345,13 @@ class MicroSocGymEnvironment(Environment):
 
         ip = (action.ip_address or "").strip()
 
-        # If admin IP is blocked, then FATAL_ACTION_PENALTY is given as it crashes system
+        # If admin IP is blocked, then ADMIN_IP_BLOCK_PENALTY is given as it is very important to the system
         if ip in self.admin_ip:
             return (
-                FATAL_ACTION_PENALTY,
-                True,
+                ADMIN_IP_BLOCK_PENALTY,
                 False,
-                f"FATAL! {ip} is the admin IP and should not be blocked. Episode failed.",
+                False,
+                f"FATAL! {ip} is the admin IP and should not be blocked. System stability is compromised.",
             )
 
         # If attacker IP is blocked, then CORRECT_ACTION_REWARD is given
@@ -368,10 +365,10 @@ class MicroSocGymEnvironment(Environment):
                 f"CORRECT! Brute force attacker IP - {ip} is blocked. Threat neutralised.",
             )
 
-        # If block_ip tool is used but the IP blocked is not the attacker IP, then PARTIAL_ACTION_REWARD is given
+        # If block_ip tool is used but the IP blocked is not the attacker IP, then CORRECT_TOOL_WRONG_TARGET_REWARD is given
         # Tool choice is correct but wrong IP is blocked, so feedback is given accordingly
         return (
-            PARTIAL_ACTION_REWARD,
+            CORRECT_TOOL_WRONG_TARGET_REWARD,
             False,
             False,
             f"Blocked {ip}, but that is not the attacker. Re-check the logs.",
@@ -415,10 +412,10 @@ class MicroSocGymEnvironment(Environment):
             ip = (action.ip_address or "").strip()
 
             # If IP was already blocked (agent already executed this tool in a previous step) then penalise it
-            # Another way the agent tried to game the system by lowkey just blocking ip again and again
+            # Another way the agent tried to game the system by lowkey just blocking IP again and again
             if is_ip_blocked(ip):
                 return (
-                    WRONG_TOOL_PENALTY,
+                    UNWARRANTED_ACTION_REPEAT_PENALTY,
                     False,
                     False,
                     f"IP {ip} is already blocked. Re-check the logs for other indicators of compromise and choose the right action.",
@@ -440,10 +437,10 @@ class MicroSocGymEnvironment(Environment):
                     f"CORRECT! Attacker IP - {ip} is blocked. {'Threat neutralised.' if done else hint}",
                 )
 
-            # If block_ip tool is used but the IP blocked is not the attacker IP, then PARTIAL_ACTION_REWARD is given
+            # If block_ip tool is used but the IP blocked is not the attacker IP, then CORRECT_TOOL_WRONG_TARGET_REWARD is given
             # Tool choice is correct but wrong IP is blocked, so feedback is given accordingly
             return (
-                PARTIAL_ACTION_REWARD,
+                CORRECT_TOOL_WRONG_TARGET_REWARD,
                 False,
                 False,
                 f"Wrong IP {ip} blocked. Re-check the logs and choose the right IP.",
@@ -476,10 +473,10 @@ class MicroSocGymEnvironment(Environment):
                         f"CORRECT! PID {pid} is killed. {'Threat neutralised.' if done else hint}",
                     )
                 
-                # If hard_attack script is alive and runningm then wrong PID was given, so penalty is given and feedback is given
+                # If hard_attack script is alive and running then wrong PID was given, so CORRECT_TOOL_WRONG_TARGET_REWARD is given and feedback is given
                 else:
                     return (
-                        PARTIAL_ACTION_REWARD,
+                        CORRECT_TOOL_WRONG_TARGET_REWARD,
                         False,
                         False,
                         f"Process {pid} killed, but it was not the malicious process. Re-check the logs and choose the right action.",
@@ -487,7 +484,7 @@ class MicroSocGymEnvironment(Environment):
             # If process killing is not successful, then penalty is given and feedback is given
             else:
                 return (
-                    WRONG_TOOL_PENALTY,
+                    PROCESS_KILL_FAIL_PENALTY,
                     False,
                     False,
                     f"Process {pid} may already be dead or not found or could not be killed.",
@@ -517,20 +514,21 @@ class MicroSocGymEnvironment(Environment):
                 )
 
             # If backoor file doesn't exist but the agent tries to delete it, then it is an attempt to game the system
-            # So, WRONG_TOOL_PENALTY is given and feedback is provided accordingly  
+            # So, UNWARRANTED_ACTION_REPEAT_PENALTY is given and feedback is provided accordingly  
             # The agent didn't do this, but seeing it trying that with block_ip, added it here as a safeguard as well
             elif not backdoor_exists and path == backdoor_path:
                 return (
-                    WRONG_TOOL_PENALTY,
+                    UNWARRANTED_ACTION_REPEAT_PENALTY,
                     False,
                     False,
                     "Backdoor file not found or already deleted.",
                 )
             
-            # If a wrong file is tried to be deleted, then penalty is given and feedback is given accordingly
+            # If a wrong file is attempted to be deleted, then that is very bad, but data is still recoverable so not as bad as FATAL
+            # WRONG_FILE_DELETION_PENALTY is given and feedback is given accordingly
             else:
                 return (
-                    WRONG_TOOL_PENALTY,
+                    WRONG_FILE_DELETION_PENALTY,
                     False,
                     False,
                     "Wrong file deleted. Re-check the logs and identify the right file to delete.",
