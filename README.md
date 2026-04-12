@@ -99,7 +99,7 @@ To help visualise the environment, we built an interactive Gradio Dashboard whic
 
 It lets you manually play the role of the responding agent. By reading the logs, triggering tools, and seeing how the environment scores your actions, you can easily understand the mechanics, constraints, and underlying reward logic the Agent has to learn.
 
-https://github.com/user-attachments/assets/e3428fef-4008-47f6-b9df-d95cee8cc7a6
+<video controls src="./media/gradio-dashboard.mp4" style="max-width:100%;height:auto;"></video>
 
 ## 6. Setup & Usage Instructions
 
