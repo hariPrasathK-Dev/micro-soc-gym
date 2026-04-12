@@ -100,7 +100,7 @@ def reward_chart_svg(history: List[Tuple[int, float, str]]) -> str:
         bars += (
             f'<text x="{bx + BAR_W/2:.0f}" y="{label_y:.0f}" '
             f'text-anchor="middle" font-size="9" fill="{color}" '
-            f'font-family="monospace" font-weight="700">{r:+.1f}</text>'
+            f'font-family="monospace" font-weight="700">{r:+.2f}</text>'
         )
         bars += (
             f'<text x="{bx + BAR_W/2:.0f}" y="{MID + MAX_BAR + 24}" '
