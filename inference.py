@@ -140,6 +140,7 @@ def main():
             action_str = ""
             error_msg = "null"
             reward = 0.00
+            inner_info = ""
 
             try:
                 # Sends prompt to model and fetches response
@@ -181,6 +182,7 @@ def main():
                 action_str = action_str or "{}"
                 reward = -1.0
                 done = True
+                inner_info = "Error: " + error_msg
 
             rewards.append(reward)
 
