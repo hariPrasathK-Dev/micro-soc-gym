@@ -30,3 +30,4 @@ class MicroSocGymState(State):
     total_reward: float = 0.0 # Cumulative reward till the current step
     threat_neutralised: bool = False # Marks if the threat has been neutralised or not
     investigated: bool = False # Marks if the agent used any investigative tools (reading logs) till now
+    episode_done: bool = False # for the visual ui to disable buttons based on when it is done

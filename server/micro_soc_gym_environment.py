@@ -137,6 +137,7 @@ class MicroSocGymEnvironment(Environment):
             total_reward=0.0,
             threat_neutralised=False,
             investigated=False,
+            episode_done=False,
         )
 
         self._used_tools = set() # Create set to track used tools in the episode
@@ -168,23 +169,29 @@ class MicroSocGymEnvironment(Environment):
 
     # Step method that executes an action and returns its results and a new observation
     def step(self, action: MicroSocGymAction) -> MicroSocGymObservation:
-        self._state.step_count += 1
-        scenario = self._state.scenario
+        # Guard against post-episode calls
+        if self._state.episode_done:
+            return MicroSocGymObservation(
+                reward=0.0,
+                done=True,
+                success=self._state.threat_neutralised,
+                info="Episode is already over. Call reset() to start a new episode.",
+            )
 
-        # Gets the observation and agent reward for the action taken
+        self._state.step_count += 1
         reward, done, success, info = self._calculate_reward(action, scenario)
 
-        # Updates total_reward and threat status
         self._state.total_reward += reward
         if success:
             self._state.threat_neutralised = True
 
-        # Ends the episode if it expires (max steps reached without success)
         if self._state.step_count >= MAX_STEPS and not done:
             done = True
             info += f" | Episode timed out after {MAX_STEPS} steps."
 
-        # Returns the observation for the action taken
+        if done:
+            self._state.episode_done = True    # ← set the flag
+
         return MicroSocGymObservation(
             reward=reward,
             done=done,
