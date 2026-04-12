@@ -30,63 +30,283 @@ from server.ui.components import (
 )
 from server.ui.handlers import handle_reset, handle_step
 
-
-# ── Stylesheet ────────────────────────────────────────────────────────────────
+# Stylesheet
 
 CSS = """
-/* Base */
-body, .gradio-container {
-    background: #080e1a !important;
-    color: #e2e8f0 !important;
-    font-family: 'Inter', system-ui, sans-serif !important;
+/* ── Custom properties — dark mode (Gradio default) ── */
+:root {
+    --soc-surface:      #0f172a;
+    --soc-surface-2:    #111827;
+    --soc-border:       #1e293b;
+    --soc-border-2:     #1f2d3d;
+    --soc-text-primary: #e2e8f0;
+    --soc-text-muted:   #94a3b8;
+    --soc-text-faint:   #475569;
+    --soc-text-dimmer:  #334155;
+    --soc-code-bg:      #0a0f1a;
+    --soc-chart-bg:     #080e1a;
 }
 
-/* Remove Gradio's default white card shadow */
+/* ── Light mode overrides ── */
+@media (prefers-color-scheme: light) {
+    :root {
+        --soc-surface:      #f8fafc;
+        --soc-surface-2:    #f1f5f9;
+        --soc-border:       #cbd5e1;
+        --soc-border-2:     #e2e8f0;
+        --soc-text-primary: #0f172a;
+        --soc-text-muted:   #475569;
+        --soc-text-faint:   #64748b;
+        --soc-text-dimmer:  #94a3b8;
+        --soc-code-bg:      #f1f5f9;
+        --soc-chart-bg:     #f8fafc;
+    }
+}
+
+/* Gradio also injects a data-theme attribute — cover both */
+[data-theme="light"] {
+    --soc-surface:      #f8fafc;
+    --soc-surface-2:    #f1f5f9;
+    --soc-border:       #cbd5e1;
+    --soc-border-2:     #e2e8f0;
+    --soc-text-primary: #0f172a;
+    --soc-text-muted:   #475569;
+    --soc-text-faint:   #64748b;
+    --soc-text-dimmer:  #94a3b8;
+    --soc-code-bg:      #f1f5f9;
+    --soc-chart-bg:     #f8fafc;
+}
+
+/* ── Scenario card ── */
+.soc-scenario-card {
+    background: var(--soc-surface);
+    border: 1px solid var(--soc-border);
+    border-left: 4px solid var(--soc-border);
+    border-radius: 8px;
+    padding: 14px 18px;
+    font-family: monospace;
+    line-height: 1.75;
+}
+.soc-scenario-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 10px;
+    border-radius: 12px;
+    border: 1px solid;
+    letter-spacing: 0.5px;
+}
+.soc-scenario-threat {
+    font-size: 13px;
+    color: var(--soc-text-primary);
+    margin-top: 4px;
+}
+.soc-hint-line {
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--soc-text-muted);
+}
+.soc-hint-key {
+    color: var(--soc-text-faint);
+}
+.soc-warn-block {
+    margin-top: 10px;
+    padding: 8px 12px;
+    background: #2d1515;
+    border-left: 3px solid #ef4444;
+    border-radius: 4px;
+    font-size: 12px;
+    color: #fca5a5;
+}
+
+/* ── Outcome banner ── */
+.soc-outcome {
+    border-radius: 8px;
+    padding: 12px 18px;
+    font-family: monospace;
+    font-size: 13px;
+}
+.soc-outcome-running {
+    background: var(--soc-surface);
+    border: 1px solid var(--soc-border-2);
+    color: var(--soc-text-faint);
+}
+.soc-outcome-success {
+    background: #052e16;
+    border: 2px solid #16a34a;
+    padding: 16px 20px;
+}
+.soc-outcome-fail {
+    background: #2d0a0a;
+    border: 2px solid #dc2626;
+    padding: 16px 20px;
+}
+.soc-outcome-title {
+    font-size: 15px;
+    font-weight: 700;
+}
+.soc-outcome-success .soc-outcome-title { color: #4ade80; }
+.soc-outcome-fail    .soc-outcome-title { color: #f87171; }
+.soc-outcome-sub {
+    font-size: 12px;
+    margin-top: 4px;
+}
+.soc-outcome-success .soc-outcome-sub { color: #86efac; }
+.soc-outcome-fail    .soc-outcome-sub { color: #fca5a5; }
+
+/* ── Hard progress ── */
+.soc-progress-box {
+    background: var(--soc-surface);
+    border: 1px solid var(--soc-border-2);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-top: 8px;
+}
+.soc-progress-label {
+    font-size: 11px;
+    color: var(--soc-text-faint);
+    font-family: monospace;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+}
+.soc-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-family: monospace;
+    padding: 5px 12px;
+    border-radius: 20px;
+    border: 1px solid;
+}
+.soc-pill-done    { background: #052e16; border-color: #16a34a; color: #4ade80; }
+.soc-pill-pending { background: var(--soc-surface-2); border-color: var(--soc-border); color: var(--soc-text-faint); }
+
+/* ── Stat card ── */
+.soc-stat-card {
+    background: var(--soc-surface);
+    border: 1px solid var(--soc-border-2);
+    border-radius: 8px;
+    padding: 12px 16px;
+    text-align: center;
+}
+.soc-stat-label {
+    font-size: 11px;
+    color: var(--soc-text-dimmer);
+    font-family: monospace;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+}
+.soc-stat-value {
+    font-size: 22px;
+    font-weight: 700;
+    font-family: monospace;
+}
+
+/* ── Action history table ── */
+.soc-hist-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: monospace;
+}
+.soc-hist-header { border-bottom: 2px solid var(--soc-border); }
+.soc-hist-th {
+    text-align: left;
+    padding: 6px 10px;
+    color: var(--soc-text-dimmer);
+    font-size: 11px;
+    font-weight: 600;
+}
+.soc-hist-row { border-bottom: 1px solid var(--soc-border); }
+.soc-hist-cell { padding: 7px 10px; }
+.soc-hist-step    { color: var(--soc-text-faint); font-size: 11px; }
+.soc-hist-param   { color: var(--soc-text-muted); font-size: 12px;
+                    max-width: 140px; overflow: hidden;
+                    text-overflow: ellipsis; white-space: nowrap; }
+.soc-hist-feedback { color: var(--soc-text-faint); font-size: 11px; }
+.soc-empty-state {
+    color: var(--soc-text-dimmer);
+    font-style: italic;
+    font-family: monospace;
+    font-size: 13px;
+    padding: 16px 0;
+    text-align: center;
+}
+
+/* ── Reward chart ── */
+.soc-chart-svg {
+    width: 100%;
+    background: var(--soc-chart-bg);
+    border-radius: 8px;
+    display: block;
+}
+.soc-chart-baseline { stroke: var(--soc-text-faint); }
+.soc-chart-grid     { stroke: var(--soc-border); }
+.soc-chart-axis-text { fill: var(--soc-text-dimmer); }
+.soc-chart-empty {
+    height: 110px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--soc-text-dimmer);
+    font-family: monospace;
+    font-size: 12px;
+}
+
+/* ── Reference tables ── */
+.soc-ref-table  { width: 100%; border-collapse: collapse; }
+.soc-ref-header { border-bottom: 2px solid var(--soc-border); }
+.soc-ref-th {
+    text-align: left;
+    padding: 6px 12px;
+    color: var(--soc-text-dimmer);
+    font-size: 11px;
+    font-weight: 600;
+}
+.soc-ref-row    { border-bottom: 1px solid var(--soc-border); }
+.soc-ref-desc   { padding: 7px 12px; color: var(--soc-text-muted); font-size: 12px; }
+.soc-ref-cell      { padding: 8px 12px; color: var(--soc-text-muted); font-size: 12px; }
+.soc-ref-cell-mono { padding: 8px 12px; color: var(--soc-text-faint); font-size: 12px; font-family: monospace; }
+.soc-ref-cell-fix  { padding: 8px 12px; color: #38bdf8; font-size: 12px; font-family: monospace; }
+.soc-ref-cell-note { padding: 8px 12px; color: var(--soc-text-dimmer); font-size: 11px; }
+
+/* ── Gradio Blocks overrides ── */
 .gradio-container .prose { max-width: 100% !important; }
-.block { border: none !important; background: transparent !important; }
 
-/* Section panels */
-.soc-panel {
-    background: #0f172a;
-    border: 1px solid #1e293b;
-    border-radius: 10px;
-    padding: 20px 22px;
-}
-
-/* Feedback box - monospace terminal feel */
+/* Feedback box */
 .feedback-box textarea {
-    background: #0a0f1a !important;
-    color: #94a3b8 !important;
+    background: var(--soc-code-bg) !important;
+    color: var(--soc-text-muted) !important;
     font-family: 'JetBrains Mono', 'Fira Code', monospace !important;
     font-size: 12px !important;
-    border: 1px solid #1e293b !important;
+    border: 1px solid var(--soc-border) !important;
     border-radius: 8px !important;
     line-height: 1.7 !important;
 }
-.feedback-box label { color: #334155 !important; font-size: 11px !important; }
+.feedback-box label {
+    color: var(--soc-text-dimmer) !important;
+    font-size: 11px !important;
+}
 
-/* Tool input fields */
+/* Tool inputs */
 .tool-input input, .tool-input textarea {
-    background: #111827 !important;
-    color: #e2e8f0 !important;
-    border: 1px solid #1e293b !important;
+    background: var(--soc-surface-2) !important;
+    color: var(--soc-text-primary) !important;
+    border: 1px solid var(--soc-border) !important;
     border-radius: 6px !important;
     font-family: 'JetBrains Mono', monospace !important;
     font-size: 13px !important;
 }
-.tool-input label { color: #475569 !important; font-size: 11px !important; letter-spacing: 0.3px; }
-.tool-input input:focus { border-color: #3b82f6 !important; outline: none !important; }
-
-/* Dropdown */
-.tool-dropdown select, .tool-dropdown input {
-    background: #111827 !important;
-    color: #e2e8f0 !important;
-    border: 1px solid #1e293b !important;
-    font-family: monospace !important;
-    font-size: 13px !important;
+.tool-input label {
+    color: var(--soc-text-faint) !important;
+    font-size: 11px !important;
+    letter-spacing: 0.3px;
+}
+.tool-input input:focus {
+    border-color: #3b82f6 !important;
+    outline: none !important;
 }
 
-/* Buttons */
+/* Buttons — colors are fixed (not theme-aware) because they carry semantic meaning */
 .btn-reset {
     background: #1d4ed8 !important;
     color: #fff !important;
@@ -110,7 +330,8 @@ body, .gradio-container {
     font-family: monospace !important;
     transition: background 0.15s;
 }
-.btn-investigate:hover { background: #075985 !important; }
+.btn-investigate:hover  { background: #075985 !important; }
+.btn-investigate:disabled { opacity: 0.35 !important; cursor: not-allowed !important; }
 
 .btn-remediate {
     background: #3b0764 !important;
@@ -122,17 +343,28 @@ body, .gradio-container {
     font-family: monospace !important;
     transition: background 0.15s;
 }
-.btn-remediate:hover { background: #4c0a8e !important; }
+.btn-remediate:hover   { background: #4c0a8e !important; }
+.btn-remediate:disabled { opacity: 0.35 !important; cursor: not-allowed !important; }
 
 /* Section labels */
 .section-label {
     font-size: 10px;
     font-weight: 600;
     letter-spacing: 1px;
-    color: #334155;
+    color: var(--soc-text-dimmer);
     font-family: monospace;
     margin-bottom: 10px;
     text-transform: uppercase;
+}
+
+/* code tags inside HTML components */
+.soc-scenario-card code,
+.soc-hint-line code {
+    background: var(--soc-code-bg);
+    color: #38bdf8;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 11px;
 }
 """
 
@@ -160,7 +392,7 @@ def build_ui(env: MicroSocGymEnvironment) -> gr.Blocks:
 
     with gr.Blocks(css=CSS, head=HEAD, title="Micro-SOC Gym") as demo:
 
-        # ── Title bar ──────────────────────────────────────────────────────
+        # Title bar
         gr.HTML("""
         <div style="padding:28px 0 4px;border-bottom:1px solid #0f172a;margin-bottom:20px;">
           <div style="display:flex;align-items:baseline;gap:14px;">
@@ -179,7 +411,7 @@ def build_ui(env: MicroSocGymEnvironment) -> gr.Blocks:
         </div>
         """)
 
-        # ── Reset + scenario header ────────────────────────────────────────
+        # Reset + scenario header
         with gr.Row():
             with gr.Column(scale=4):
                 scenario_header_html = gr.HTML(scenario_header(""))
@@ -196,12 +428,12 @@ def build_ui(env: MicroSocGymEnvironment) -> gr.Blocks:
         # Episode outcome
         outcome_html = gr.HTML(outcome_banner(False, False, 0.0, 0))
 
-        # ── Stats row ─────────────────────────────────────────────────────
+        # Stats row
         with gr.Row():
             steps_stat  = gr.HTML(stat_card("STEPS", "— / 8"))
             reward_stat = gr.HTML(stat_card("TOTAL REWARD", "—"))
 
-        # ── Main two-column layout ─────────────────────────────────────────
+        # Main two-column layout
         with gr.Row(equal_height=False):
 
             # Left column — action controls + feedback
@@ -296,14 +528,14 @@ def build_ui(env: MicroSocGymEnvironment) -> gr.Blocks:
                 )
                 history_html = gr.HTML(action_history_table([]))
 
-        # ── Reference tables (collapsed by default) ───────────────────────
+        # Reference tables (collapsed by default)
         with gr.Accordion("Scenario reference", open=False):
             gr.HTML(scenario_reference_html())
 
         with gr.Accordion("Reward reference", open=False):
             gr.HTML(reward_reference_html())
 
-        # ── Shared output list ────────────────────────────────────────────
+        # Shared output list
         # Order must match the return tuples in handlers.py exactly.
         # ALL five tool buttons are included so handlers can disable every
         # one of them when done=True, preventing the "9 / 8" overshoot.
@@ -323,7 +555,7 @@ def build_ui(env: MicroSocGymEnvironment) -> gr.Blocks:
             btn_kill_process,       # 12 — remediation
         ]
 
-        # ── Wiring ────────────────────────────────────────────────────────
+        # Wiring
 
         # Reset
         reset_btn.click(fn=_reset, inputs=[], outputs=_outputs)
