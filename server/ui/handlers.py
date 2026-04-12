@@ -166,7 +166,7 @@ def handle_step(
     return (
         scenario_header(scenario),
         stat_card("STEPS TAKEN", f"{step_count} / 8", steps_color),
-        stat_card("TOTAL CUMULATIVEREWARD", f"{total_reward:+.2f}", r_color),
+        stat_card("TOTAL CUMULATIVE REWARD", f"{total_reward:+.2f}", r_color),
         reward_chart_svg(_step_rewards),
         obs.info if "Logs:" in obs.info else gr.update(),
         obs.info if "Logs:" not in obs.info else "Correct investigative action! Logs read successfully.",
