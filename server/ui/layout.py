@@ -11,9 +11,6 @@ from functools import partial
 from server.micro_soc_gym_environment import MicroSocGymEnvironment
 from server.ui.components import (
     scenario_header,
-    outcome_banner,
-    hard_progress,
-    action_history_table,
     reward_chart_svg,
     reward_reference_html,
     scenario_reference_html,
@@ -79,17 +76,20 @@ CSS = """
     line-height: 1.75;
 }
 .soc-scenario-badge {
-    font-size: 11px;
-    font-weight: 700;
-    padding: 2px 10px;
-    border-radius: 12px;
-    border: 1px solid;
-    letter-spacing: 0.5px;
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    padding: 6px 14px !important;
+    border-radius: 9999px !important; /* Pill shape */
+    border: 1px solid !important;
+    letter-spacing: 0.5px !important;
+    display: inline-block !important;
 }
 .soc-scenario-threat {
-    font-size: 13px;
-    color: var(--soc-text-primary);
-    margin-top: 4px;
+    font-size: 17px !important;
+    font-weight: 500 !important;
+    color: var(--soc-text-primary) !important;
+    margin-top: 10px !important;
+    line-height: 1.4 !important;
 }
 .soc-hint-line {
     margin-top: 8px;
@@ -193,36 +193,6 @@ CSS = """
     font-family: monospace;
 }
 
-/* Action history table */
-.soc-hist-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-family: monospace;
-}
-.soc-hist-header { border-bottom: 2px solid var(--soc-border); }
-.soc-hist-th {
-    text-align: left;
-    padding: 6px 10px;
-    color: var(--soc-text-dimmer);
-    font-size: 11px;
-    font-weight: 600;
-}
-.soc-hist-row { border-bottom: 1px solid var(--soc-border); }
-.soc-hist-cell { padding: 7px 10px; }
-.soc-hist-step    { color: var(--soc-text-faint); font-size: 11px; }
-.soc-hist-param   { color: var(--soc-text-muted); font-size: 12px;
-                    max-width: 140px; overflow: hidden;
-                    text-overflow: ellipsis; white-space: nowrap; }
-.soc-hist-feedback { color: var(--soc-text-faint); font-size: 11px; }
-.soc-empty-state {
-    color: var(--soc-text-dimmer);
-    font-style: italic;
-    font-family: monospace;
-    font-size: 13px;
-    padding: 16px 0;
-    text-align: center;
-}
-
 /* Reward chart */
 .soc-chart-svg {
     width: 100%;
@@ -232,9 +202,8 @@ CSS = """
 }
 .soc-chart-baseline { stroke: var(--soc-text-faint); }
 .soc-chart-grid     { stroke: var(--soc-border); }
-.soc-chart-axis-text { fill: var(--soc-text-dimmer); }
 .soc-chart-empty {
-    height: 110px;
+    height: 200px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -374,23 +343,21 @@ def build_ui(env: MicroSocGymEnvironment) -> gr.Blocks:
     _reset = partial(handle_reset, env)
     _step  = partial(handle_step, env)
 
-    with gr.Blocks(css=CSS, head=HEAD, title="Micro-SOC Gym") as demo:
+    with gr.Blocks(css=CSS, head=HEAD, title="Micro SOC Gym") as demo:
 
         # Title bar
         gr.HTML("""
         <div style="padding:28px 0 4px;border-bottom:1px solid #0f172a;margin-bottom:20px;">
           <div style="display:flex;align-items:baseline;gap:14px;">
             <span style="font-size:20px;font-weight:700;color:#e2e8f0;letter-spacing:-0.5px;">
-              Micro-SOC Gym
+              Micro SOC Gym
             </span>
             <span style="font-size:12px;color:#334155;font-family:monospace;">
-              RL · Security Operations · Meta × HuggingFace Hackathon
+              Meta x HuggingFace Hackathon
             </span>
           </div>
           <p style="font-size:13px;color:#475569;margin:6px 0 0;line-height:1.5;">
-            An RL environment where an agent triages security incidents across three
-            escalating scenarios. Each episode: investigate logs → identify the threat
-            → remediate with the right tool(s). 8-step budget.
+            An Reinforcement Learning (RL) environment where an agent triages security incidents across three scenarios simulating different attacks. Investigate, Identify Attack & Remediate, all within 8 steps. 
           </p>
         </div>
         """)
@@ -406,22 +373,16 @@ def build_ui(env: MicroSocGymEnvironment) -> gr.Blocks:
                     size="lg",
                 )
 
-        # Hard scenario progress (hidden for easy/medium)
-        hard_progress_html = gr.HTML("")
-
-        # Episode outcome
-        outcome_html = gr.HTML(outcome_banner(False, False, 0.0, 0))
-
         # Stats row
         with gr.Row():
-            steps_stat  = gr.HTML(stat_card("STEPS", "- / 8"))
-            reward_stat = gr.HTML(stat_card("TOTAL REWARD", "-"))
+            steps_stat  = gr.HTML(stat_card("STEPS TAKEN", "- / 8"))
+            reward_stat = gr.HTML(stat_card("TOTAL CUMULATIVE REWARD", "0.0"))
 
         # Main two-column layout
         with gr.Row(equal_height=False):
 
-            # Left column - action controls + feedback
-            with gr.Column(scale=3):
+            # Left column - action controls
+            with gr.Column(scale=1):
 
                 # Investigative tools
                 gr.HTML(
@@ -433,13 +394,15 @@ def build_ui(env: MicroSocGymEnvironment) -> gr.Blocks:
                     btn_access_log = gr.Button(
                         "read_access_log",
                         elem_classes="btn-investigate",
+                        interactive=False,
                     )
                     btn_auth_log = gr.Button(
                         "read_auth_log",
                         elem_classes="btn-investigate",
+                        interactive=False,
                     )
 
-                gr.HTML('<div style="height:16px;"></div>')
+                gr.HTML('<div style="height:4px;"></div>')
 
                 # Remediation tools
                 gr.HTML(
@@ -459,6 +422,7 @@ def build_ui(env: MicroSocGymEnvironment) -> gr.Blocks:
                         "block_ip  →",
                         elem_classes="btn-remediate",
                         scale=1,
+                        interactive=False,
                     )
 
                 with gr.Row():
@@ -472,6 +436,7 @@ def build_ui(env: MicroSocGymEnvironment) -> gr.Blocks:
                         "delete_file  →",
                         elem_classes="btn-remediate",
                         scale=1,
+                        interactive=False,
                     )
 
                 with gr.Row():
@@ -485,54 +450,61 @@ def build_ui(env: MicroSocGymEnvironment) -> gr.Blocks:
                         "kill_process  →",
                         elem_classes="btn-remediate",
                         scale=1,
+                        interactive=False,
                     )
 
-                gr.HTML('<div style="height:16px;"></div>')
+            # Right column - log output + history
+            with gr.Column(scale=1):
 
                 # Feedback / log output area
-                gr.HTML('<div class="section-label">Last action result / log output</div>')
+                gr.HTML('<div class="section-label">Logs</div>')
                 feedback_box = gr.Textbox(
-                    value="Press  ⟳ New Episode  to begin.",
+                    value="",
                     show_label=False,
-                    lines=16,
-                    max_lines=24,
+                    lines=13,
+                    max_lines=13,
                     interactive=False,
                     elem_classes="feedback-box",
                 )
 
-            # Right column - history + chart
-            with gr.Column(scale=2):
+                gr.HTML('<div style="height:10px;"></div><div class="section-label">Action feedback</div>')
+                action_feedback_box = gr.Textbox(
+                    value="",
+                    show_label=False,
+                    lines=3,
+                    max_lines=3,
+                    interactive=False,
+                    elem_classes="feedback-box",
+                )
 
-                gr.HTML('<div class="section-label">Per-step rewards</div>')
+        # Full width reward chart below tools
+        with gr.Row():
+            with gr.Column():
+                gr.HTML('<div class="section-label">Step-wise Rewards</div>')
                 reward_chart_html = gr.HTML(reward_chart_svg([]))
 
-                gr.HTML(
-                    '<div style="height:20px;"></div>'
-                    '<div class="section-label">Action history</div>'
-                )
-                history_html = gr.HTML(action_history_table([]))
-
         # Reference tables (collapsed by default)
-        with gr.Accordion("Scenario reference", open=False):
+        with gr.Accordion("Scenario Reference", open=False):
             gr.HTML(scenario_reference_html())
 
-        with gr.Accordion("Reward reference", open=False):
+        with gr.Accordion("Reward/Penalty Reference", open=False):
             gr.HTML(reward_reference_html())
 
         _outputs = [
             scenario_header_html,
-            outcome_html,
-            hard_progress_html,
             steps_stat,
             reward_stat,
-            history_html,
             reward_chart_html,
             feedback_box,
+            action_feedback_box,
             btn_access_log,
             btn_auth_log,
             btn_block_ip,
             btn_delete_file,
             btn_kill_process,
+            ip_input,
+            file_input,
+            pid_input,
         ]
 
         # Reset

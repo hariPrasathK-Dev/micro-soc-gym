@@ -11,40 +11,28 @@ from typing import List, Tuple
 # Scenario metadata
 SCENARIO_META = {
     "easy": {
-        "label": "Easy - HTTP Flood",
+        "label": "Easy - HTTP 404 Flood",
         "color": "#22c55e",
         "border": "#16a34a",
-        "threat": "A scanner is hammering the web server with hundreds of 404 requests per second.",
-        "log_hint": "Start with <code>read_access_log</code> - look for an IP making far more requests than the others.",
-        "fix": "One action: <code>block_ip(&lt;attacker_ip&gt;)</code>",
-        "warn": None,
+        "alert": "<b>Alert Received:</b> External monitoring has detected an unusual spike in HTTP traffic and bandwidth consumption on the primary web server. Analyse and neutralise the root cause.",
     },
     "medium": {
-        "label": "Medium - SSH Brute-Force",
+        "label": "Medium - SSH Brute Force",
         "color": "#f97316",
         "border": "#ea580c",
-        "threat": "Repeated failed SSH login attempts are flooding the auth log from a single source.",
-        "log_hint": "Use <code>read_auth_log</code> - the attacker generates far more failed attempts than anyone else.",
-        "fix": "One action: <code>block_ip(&lt;attacker_ip&gt;)</code>",
-        "warn": "An admin IP is mixed in the logs. Blocking it is a fatal mistake.",
+        "alert": "<b>Alert Received:</b> Endpoint detection has flagged an anomalous pattern of authentication events and minor CPU spikes tied to remote access services. Analyse and neutralise the root cause.",
     },
     "hard": {
-        "label": "Hard - Webshell C2",
+        "label": "Hard - Active Webshell C2",
         "color": "#ef4444",
         "border": "#dc2626",
-        "threat": "A webshell has been planted and is making C2 callbacks. A malicious process is running.",
-        "log_hint": "Use <code>read_access_log</code> - find the backdoor filename and a PID in brackets.",
-        "fix": "Three actions (any order): <code>block_ip</code> + <code>delete_file</code> + <code>kill_process</code>",
-        "warn": "All three must succeed. Partial neutralisation keeps done=False.",
+        "alert": "<b>Alert Received:</b> Network monitors have detected persistent, suspicious traffic originating from within the web application itself. Analyse and neutralise the root cause.",
     },
     "": {
         "label": "No Active Episode",
         "color": "#6b7280",
         "border": "#4b5563",
-        "threat": "Press Reset to begin. Scenarios cycle: Easy \u2192 Medium \u2192 Hard \u2192 Easy\u2026",
-        "log_hint": None,
-        "fix": None,
-        "warn": None,
+        "alert": "Click the New Episode button to load a scenario. Scenarios cycle: Easy \u2192 Medium \u2192 Hard \u2192 Easy...",
     },
 }
 
@@ -52,10 +40,10 @@ REWARD_TABLE = [
     ("+0.50", "Correct investigative log for the scenario", "positive"),
     ("+0.50", "Correct remediation action on the right target", "positive"),
     ("+0.25", "Correct investigative direction but wrong log file", "partial"),
-    ("+0.10", "Correct tool, wrong IP / file / PID", "partial"),
+    ("+0.10", "Correct tool, wrong IP / PID", "partial"),
     ("\u22120.20", "kill_process on a PID that doesn't exist", "negative"),
     ("\u22120.25", "Reading logs after all remediation tools used (stalling)", "negative"),
-    ("\u22120.30", "Repeating the same log read or already-blocked action", "negative"),
+    ("\u22120.30", "Repeating an action with no changes", "negative"),
     ("\u22120.50", "Wrong tool for the scenario", "negative"),
     ("\u22120.75", "Deleting a wrong file", "negative"),
     ("\u22121.00", "Blocking the admin IP (medium scenario)", "fatal"),
@@ -69,133 +57,13 @@ def scenario_header(scenario: str) -> str:
     c   = m["color"]
     bdr = m["border"]
 
-    warn_block = ""
-    if m["warn"]:
-        warn_block = (
-            f'<div class="soc-warn-block">'
-            f'\u26a0 {m["warn"]}</div>'
-        )
-
-    log_hint_block = ""
-    if m["log_hint"]:
-        log_hint_block = (
-            f'<div class="soc-hint-line">'
-            f'<span class="soc-hint-key">HOW TO INVESTIGATE \u2192 </span>{m["log_hint"]}</div>'
-        )
-
-    fix_block = ""
-    if m["fix"]:
-        fix_block = (
-            f'<div class="soc-hint-line">'
-            f'<span class="soc-hint-key">REMEDIATION \u2192 </span>{m["fix"]}</div>'
-        )
-
     return (
         f'<div class="soc-scenario-card" style="border-color:{bdr};border-left-color:{c};">'
         f'<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">'
-        f'<span class="soc-scenario-badge" style="background:{c}1a;border-color:{c};color:{c};">'
+        f'<span class="soc-scenario-badge" style="background:{c}1a;border-color:{c};color:{c};padding:4px 8px;font-weight:700;font-size:14px;border-radius:4px;">'
         f'{m["label"].upper()}</span></div>'
-        f'<div class="soc-scenario-threat">{m["threat"]}</div>'
-        f'{log_hint_block}{fix_block}{warn_block}'
+        f'<div class="soc-scenario-threat" style="font-size:15px;">{m["alert"]}</div>'
         f'</div>'
-    )
-
-
-# Outcome banner
-def outcome_banner(done: bool, success: bool, total_reward: float, step_count: int) -> str:
-    if not done:
-        return (
-            '<div class="soc-outcome soc-outcome-running">'
-            '\u25cf Episode running \u2014 investigate then remediate the threat.'
-            '</div>'
-        )
-    if success:
-        return (
-            '<div class="soc-outcome soc-outcome-success">'
-            '<div class="soc-outcome-title">\u2713 THREAT NEUTRALISED</div>'
-            f'<div class="soc-outcome-sub">'
-            f'Completed in {step_count} steps &nbsp;\u00b7&nbsp; '
-            f'Total reward: {total_reward:+.2f} &nbsp;\u00b7&nbsp; '
-            f'Press Reset to load the next scenario.</div>'
-            '</div>'
-        )
-    return (
-        '<div class="soc-outcome soc-outcome-fail">'
-        '<div class="soc-outcome-title">\u2717 EPISODE FAILED</div>'
-        f'<div class="soc-outcome-sub">'
-        f'Ended at step {step_count} &nbsp;\u00b7&nbsp; '
-        f'Total reward: {total_reward:+.2f} &nbsp;\u00b7&nbsp; '
-        f'Press Reset to try again.</div>'
-        '</div>'
-    )
-
-
-# Hard scenario progress tracker
-def hard_progress(ip_blocked: bool, file_deleted: bool, process_killed: bool) -> str:
-    def pill(label: str, done: bool) -> str:
-        cls = "soc-pill soc-pill-done" if done else "soc-pill soc-pill-pending"
-        icon = "\u2713" if done else "\u25cb"
-        return f'<span class="{cls}">{icon} {label}</span>'
-
-    return (
-        '<div class="soc-progress-box">'
-        '<div class="soc-progress-label">HARD SCENARIO PROGRESS</div>'
-        '<div style="display:flex;gap:10px;flex-wrap:wrap;">'
-        + pill("block_ip", ip_blocked)
-        + pill("delete_file", file_deleted)
-        + pill("kill_process", process_killed)
-        + '</div></div>'
-    )
-
-
-# Action history table
-def action_history_table(history: list) -> str:
-    if not history:
-        return '<div class="soc-empty-state">No actions taken yet.</div>'
-
-    def reward_color(r: float) -> str:
-        if r >= 0.4:  return "#22c55e"
-        if r > 0:     return "#84cc16"
-        if r > -0.3:  return "#f97316"
-        return "#ef4444"
-
-    def tool_color(tool: str) -> str:
-        return "#38bdf8" if tool in ("read_access_log", "read_auth_log") else "#c084fc"
-
-    rows = ""
-    for entry in reversed(history):
-        r   = entry["reward"]
-        rc  = reward_color(r)
-        tc  = tool_color(entry["tool"])
-        icon = "\u2713" if entry["success"] else ("\u2192" if r > 0 else "\u2717")
-        ic  = "#22c55e" if entry["success"] else ("#f97316" if r > 0 else "#ef4444")
-        result_short = entry["result"][:90] + ("\u2026" if len(entry["result"]) > 90 else "")
-
-        rows += (
-            f'<tr class="soc-hist-row">'
-            f'<td class="soc-hist-cell soc-hist-step">#{entry["step"]}</td>'
-            f'<td class="soc-hist-cell">'
-            f'<span style="color:{tc};font-weight:700;font-size:12px;">{entry["tool"]}</span>'
-            f'</td>'
-            f'<td class="soc-hist-cell soc-hist-param">{entry["param"]}</td>'
-            f'<td class="soc-hist-cell" style="color:{rc};font-weight:700;font-size:13px;">{r:+.2f}</td>'
-            f'<td class="soc-hist-cell" style="color:{ic};font-weight:700;">{icon}</td>'
-            f'<td class="soc-hist-cell soc-hist-feedback">{result_short}</td>'
-            f'</tr>'
-        )
-
-    return (
-        '<div style="overflow-x:auto;">'
-        '<table class="soc-hist-table">'
-        '<thead><tr class="soc-hist-header">'
-        '<th class="soc-hist-th">STEP</th>'
-        '<th class="soc-hist-th">TOOL</th>'
-        '<th class="soc-hist-th">PARAM</th>'
-        '<th class="soc-hist-th">REWARD</th>'
-        '<th class="soc-hist-th"></th>'
-        '<th class="soc-hist-th">FEEDBACK</th>'
-        '</tr></thead>'
-        f'<tbody>{rows}</tbody></table></div>'
     )
 
 
@@ -204,12 +72,12 @@ def reward_chart_svg(history: List[Tuple[int, float, str]]) -> str:
     if not history:
         return '<div class="soc-chart-empty">Reward chart will appear here as actions are taken.</div>'
 
-    W, H    = 680, 148
-    MID     = 80
-    MAX_BAR = 60
-    BAR_W   = max(14, min(40, (W - 80) // len(history) - 6))
-    GAP     = max(4, (W - 80 - len(history) * BAR_W) // max(len(history), 1))
-    start_x = 48
+    W, H    = 1200, 200
+    MID     = 70
+    MAX_BAR = 50
+    BAR_W   = max(14, min(30, (W - 80) // 8 - 6))
+    GAP     = max(4, (W - 80 - 8 * BAR_W) // 8)
+    start_x = 60
 
     def bar_color(r: float) -> str:
         if r >= 0.4:   return "#22c55e"
@@ -235,30 +103,30 @@ def reward_chart_svg(history: List[Tuple[int, float, str]]) -> str:
             f'font-family="monospace" font-weight="700">{r:+.1f}</text>'
         )
         bars += (
-            f'<text x="{bx + BAR_W/2:.0f}" y="{H - 5}" '
-            f'text-anchor="middle" font-size="9" '
-            f'class="soc-chart-axis-text" font-family="monospace">#{step}</text>'
+            f'<text x="{bx + BAR_W/2:.0f}" y="{MID + MAX_BAR + 24}" '
+            f'text-anchor="middle" font-size="10" fill="#e2e8f0" '
+            f'font-family="monospace">{tool}()</text>'
         )
 
     axis = (
         f'<line x1="40" y1="{MID}" x2="{W - 8}" y2="{MID}" '
         f'class="soc-chart-baseline" stroke-width="1.5"/>'
-        f'<line x1="40" y1="{MID - MAX_BAR * 0.5:.0f}" x2="{W-8}" '
+        f'<line x1="40" y1="{MID - MAX_BAR * 0.5:.0f}" x2="{W - 8}" '
         f'y2="{MID - MAX_BAR * 0.5:.0f}" class="soc-chart-grid" '
         f'stroke-width="0.5" stroke-dasharray="3 3"/>'
-        f'<line x1="40" y1="{MID + MAX_BAR * 0.5:.0f}" x2="{W-8}" '
+        f'<line x1="40" y1="{MID + MAX_BAR * 0.5:.0f}" x2="{W - 8}" '
         f'y2="{MID + MAX_BAR * 0.5:.0f}" class="soc-chart-grid" '
         f'stroke-width="0.5" stroke-dasharray="3 3"/>'
-        f'<text x="36" y="{MID - MAX_BAR + 4}" text-anchor="end" font-size="9" '
-        f'class="soc-chart-axis-text" font-family="monospace">+1.0</text>'
-        f'<text x="36" y="{MID - MAX_BAR*0.5 + 4:.0f}" text-anchor="end" font-size="9" '
-        f'class="soc-chart-axis-text" font-family="monospace">+0.5</text>'
-        f'<text x="36" y="{MID + 4}" text-anchor="end" font-size="9" '
-        f'class="soc-chart-axis-text" font-family="monospace">0</text>'
-        f'<text x="36" y="{MID + MAX_BAR*0.5 + 4:.0f}" text-anchor="end" font-size="9" '
-        f'class="soc-chart-axis-text" font-family="monospace">-0.5</text>'
-        f'<text x="36" y="{MID + MAX_BAR + 4}" text-anchor="end" font-size="9" '
-        f'class="soc-chart-axis-text" font-family="monospace">-1.0</text>'
+        f'<text x="36" y="{MID - MAX_BAR + 4}" text-anchor="end" font-size="12" '
+        f'fill="#e2e8f0" font-family="monospace">+1.0</text>'
+        f'<text x="36" y="{MID - MAX_BAR*0.5 + 4:.0f}" text-anchor="end" font-size="12" '
+        f'fill="#e2e8f0" font-family="monospace">+0.5</text>'
+        f'<text x="36" y="{MID + 4}" text-anchor="end" font-size="12" '
+        f'fill="#e2e8f0" font-family="monospace">0</text>'
+        f'<text x="36" y="{MID + MAX_BAR*0.5 + 4:.0f}" text-anchor="end" font-size="12" '
+        f'fill="#e2e8f0" font-family="monospace">-0.5</text>'
+        f'<text x="36" y="{MID + MAX_BAR + 4}" text-anchor="end" font-size="12" '
+        f'fill="#e2e8f0" font-family="monospace">-1.0</text>'
     )
 
     return (
@@ -278,27 +146,45 @@ def reward_reference_html() -> str:
         "fatal":    ("#7f1d1d", "#b91c1c", "#fca5a5"),
     }
 
-    rows = ""
-    for reward_str, description, kind in REWARD_TABLE:
-        bg, border, text = color_map[kind]
-        rows += (
-            f'<tr class="soc-ref-row">'
-            f'<td style="padding:7px 12px;">'
-            f'<span style="background:{bg};border:1px solid {border};color:{text};'
-            f'font-family:monospace;font-size:12px;font-weight:700;'
-            f'padding:2px 8px;border-radius:4px;white-space:nowrap;">{reward_str}</span>'
-            f'</td>'
-            f'<td class="soc-ref-desc">{description}</td>'
-            f'</tr>'
+    def build_rows(kinds):
+        r = ""
+        for reward_str, description, kind in REWARD_TABLE:
+            if kind not in kinds:
+                continue
+            bg, border, text = color_map[kind]
+            r += (
+                f'<tr class="soc-ref-row">'
+                f'<td style="padding:7px 12px;white-space:nowrap;">'
+                f'<span style="background:{bg};border:1px solid {border};color:{text};'
+                f'font-family:monospace;font-size:12px;font-weight:700;'
+                f'padding:2px 8px;border-radius:4px;">{reward_str}</span>'
+                f'</td>'
+                f'<td class="soc-ref-desc" style="width:100%;">{description}</td>'
+                f'</tr>'
+            )
+        return r
+
+    pos_rows = build_rows(["positive", "partial"])
+    neg_rows = build_rows(["negative", "fatal"])
+
+    def build_table(title, rows):
+        return (
+            '<div style="flex: 1; min-width: 0;">'
+            f'<div style="font-size:12px;font-weight:700;color:var(--soc-text-primary);margin-bottom:8px;padding-left:12px;font-family:monospace;">{title}</div>'
+            '<table class="soc-ref-table" style="width:100%;">'
+            '<thead><tr class="soc-ref-header">'
+            '<th class="soc-ref-th">VALUE</th>'
+            '<th class="soc-ref-th" style="width:100%;">CONDITION</th>'
+            '</tr></thead>'
+            f'<tbody>{rows}</tbody></table>'
+            '</div>'
         )
 
     return (
-        '<table class="soc-ref-table">'
-        '<thead><tr class="soc-ref-header">'
-        '<th class="soc-ref-th">REWARD</th>'
-        '<th class="soc-ref-th">CONDITION</th>'
-        '</tr></thead>'
-        f'<tbody>{rows}</tbody></table>'
+        '<div style="display:flex; gap:24px; align-items:flex-start; width:100%;">'
+        + build_table("REWARDS", pos_rows)
+        + build_table("PENALTIES", neg_rows)
+        + '</div>'
     )
 
 
@@ -307,10 +193,10 @@ def scenario_reference_html() -> str:
     rows = [
         ("Easy",   "#22c55e", "access.log", "404 flood from random attacker IP",
          "block_ip(attacker)", "1 action"),
-        ("Medium", "#f97316", "auth.log",   "SSH brute-force + whitelisted admin IP mixed in",
+        ("Medium", "#f97316", "auth.log",   "SSH brute force with admin IP traffic mixed in",
          "block_ip(attacker)", "1 action, don't block admin"),
-        ("Hard",   "#ef4444", "access.log", "Webshell C2 + backdoor file + rogue process",
-         "block_ip + delete_file + kill_process", "3 actions, any order"),
+        ("Hard",   "#ef4444", "access.log", "A backdoor file planted by an attacker IP that runs a malicious process for an Active Webshell C2",
+         "block_ip(attacker)<br>delete_file(backdoor)<br>kill_process(malicious process)", "3 actions, backdoor must be deleted before killing process"),
     ]
     tbody = ""
     for label, color, log_src, pattern, fix, note in rows:
@@ -321,8 +207,8 @@ def scenario_reference_html() -> str:
             f'</td>'
             f'<td class="soc-ref-cell-mono">{log_src}</td>'
             f'<td class="soc-ref-cell">{pattern}</td>'
-            f'<td class="soc-ref-cell-fix">{fix}</td>'
-            f'<td class="soc-ref-cell-note">{note}</td>'
+            f'<td class="soc-ref-cell-fix" style="white-space:nowrap;">{fix}</td>'
+            f'<td class="soc-ref-cell-note" style="white-space:nowrap;">{note}</td>'
             f'</tr>'
         )
     return (
@@ -330,9 +216,9 @@ def scenario_reference_html() -> str:
         '<thead><tr class="soc-ref-header">'
         '<th class="soc-ref-th">SCENARIO</th>'
         '<th class="soc-ref-th">LOG</th>'
-        '<th class="soc-ref-th">ATTACK PATTERN</th>'
-        '<th class="soc-ref-th">CORRECT TOOL(S)</th>'
-        '<th class="soc-ref-th">NOTE</th>'
+        '<th class="soc-ref-th" style="width: 100%;">ATTACK PATTERN</th>'
+        '<th class="soc-ref-th" style="white-space: nowrap;">CORRECT TOOL(S)</th>'
+        '<th class="soc-ref-th" style="white-space: nowrap;">NOTE</th>'
         '</tr></thead>'
         f'<tbody>{tbody}</tbody></table>'
     )

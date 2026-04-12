@@ -13,9 +13,6 @@ from server.micro_soc_gym_environment import MicroSocGymEnvironment
 from server.constants import MAX_STEPS
 from server.ui.components import (
     scenario_header,
-    outcome_banner,
-    hard_progress,
-    action_history_table,
     reward_chart_svg,
     stat_card,
 )
@@ -86,18 +83,19 @@ def handle_reset(env: MicroSocGymEnvironment):
 
     return (
         scenario_header(scenario),
-        outcome_banner(False, False, 0.0, 0),
-        hard_progress(False, False, False) if scenario == "hard" else "",
-        stat_card("STEPS", "0 / 8"),
-        stat_card("TOTAL REWARD", "+0.00", "#38bdf8"),
-        action_history_table([]),
+        stat_card("STEPS TAKEN", "0 / 8"),
+        stat_card("TOTAL CUMULATIVE REWARD", "+0.00", "#38bdf8"),
         reward_chart_svg([]),
-        obs.info,
+        "",
+        "",
         _btn_on,
         _btn_on,
         _btn_on,
         _btn_on,
         _btn_on,
+        gr.Textbox(value=""),
+        gr.Textbox(value=""),
+        gr.Textbox(value=""),
     )
 
 
@@ -155,11 +153,7 @@ def handle_step(
         r_color = "#38bdf8"
 
     # Hard scenario progress
-    if scenario == "hard":
-        ip_b, file_d, proc_k = _hard_progress_state(env)
-        hard_prog = hard_progress(ip_b, file_d, proc_k)
-    else:
-        hard_prog = ""
+    hard_prog = ""
 
     # When the episode ends, disable every tool button so the user cannot
     # fire a 9th action past the 8-step budget. Reset re-enables them all.
@@ -171,16 +165,17 @@ def handle_step(
 
     return (
         scenario_header(scenario),
-        outcome_banner(obs.done, obs.success, total_reward, step_count),
-        hard_prog,
-        stat_card("STEPS", f"{step_count} / 8", steps_color),
-        stat_card("TOTAL REWARD", f"{total_reward:+.2f}", r_color),
-        action_history_table(_action_history),
+        stat_card("STEPS TAKEN", f"{step_count} / 8", steps_color),
+        stat_card("TOTAL CUMULATIVEREWARD", f"{total_reward:+.2f}", r_color),
         reward_chart_svg(_step_rewards),
-        obs.info,
+        obs.info if "Logs:" in obs.info else gr.update(),
+        obs.info if "Logs:" not in obs.info else "Correct investigative action! Logs read successfully.",
         _btn,
         _btn,
         _btn,
         _btn,
         _btn,
+        gr.update(),
+        gr.update(),
+        gr.update(),
     )
