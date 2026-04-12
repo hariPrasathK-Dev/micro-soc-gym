@@ -136,7 +136,7 @@ python inference.py
 
 The codebase handles networking logic decoupled from kernel requirements via a supervised orchestration.
 
-![Micro-SOC Gym system architecture](architecture-diagram.png)
+![Micro-SOC Gym system architecture](/media/architecture-diagram.png)
 
 ## 8. Project Structure
 
