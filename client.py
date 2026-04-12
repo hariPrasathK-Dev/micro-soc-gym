@@ -4,27 +4,9 @@
 # This source code is licensed under the BSD-style license found in the
 # LICENSE file in the root directory of this source tree.
 
-"""
-Micro-SOC Gym – runnable demo client.
-
-Connects to a running Micro-SOC Gym server and cycles through all three
-threat scenarios, printing each observation to the terminal.
-
-Usage (against local Docker container on port 7860):
-    python client.py
-    python client.py --url http://localhost:7860
-    python client.py --url https://<your-space>.hf.space
-
-Dependencies:
-    pip install requests
-"""
-
 from __future__ import annotations
 
-import argparse
 import json
-import sys
-import time
 from typing import Any, Dict, Optional
 
 try:
@@ -33,42 +15,29 @@ except ImportError:
     raise ImportError("requests is required: pip install requests")
 
 
-# ---------------------------------------------------------------------------
-# Low-level HTTP helpers
-# ---------------------------------------------------------------------------
-
+# Client for interacting with the Micro SOC Gym REST API
 class MicroSocGymClient:
-    """
-    Thin HTTP client for the Micro-SOC Gym environment API.
 
-    The server exposes three endpoints:
-        POST /reset  → start a new episode, returns MicroSocGymObservation
-        POST /step   → execute one action,   returns MicroSocGymObservation
-        GET  /state  → episode metadata,     returns MicroSocGymState
-    """
-
+    # Initialse the client session with base url (docker container)
     def __init__(self, base_url: str = "http://localhost:7860", timeout: int = 30):
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self.session = requests.Session()
         self.session.headers.update({"Content-Type": "application/json"})
 
-    # ------------------------------------------------------------------
-    # API methods
-    # ------------------------------------------------------------------
-
+    # Health endpint to check API server status
     def health(self) -> Dict[str, Any]:
-        """GET /health - confirm the server is up."""
         resp = self.session.get(f"{self.base_url}/health", timeout=self.timeout)
         resp.raise_for_status()
         return resp.json()
-
+    
+    # Reset the environment for a new episode
     def reset(self) -> Dict[str, Any]:
-        """POST /reset - start a new episode."""
         resp = self.session.post(f"{self.base_url}/reset", timeout=self.timeout)
         resp.raise_for_status()
         return resp.json()
 
+    # Steps through process executing a tool action and returns its result
     def step(
         self,
         tool: str,
@@ -76,15 +45,6 @@ class MicroSocGymClient:
         file_path: Optional[str] = None,
         pid: Optional[int] = None,
     ) -> Dict[str, Any]:
-        """
-        POST /step - execute one agent action.
-
-        Args:
-            tool:       One of "block_ip", "delete_file", "kill_process"
-            ip_address: Required for block_ip
-            file_path:  Required for delete_file
-            pid:        Required for kill_process
-        """
         action_payload: Dict[str, Any] = {"tool": tool}
         if ip_address is not None:
             action_payload["ip_address"] = ip_address
@@ -103,12 +63,23 @@ class MicroSocGymClient:
         resp.raise_for_status()
         return resp.json()
 
+    # Retrieve the current state of the environment
     def state(self) -> Dict[str, Any]:
-        """GET /state - current episode metadata."""
         resp = self.session.get(f"{self.base_url}/state", timeout=self.timeout)
         resp.raise_for_status()
         return resp.json()
 
+    # Grade the completed episode based on scenario, returns a score between (0, 1)
+    def grade_episode(self, scenario: str) -> float:
+        resp = self.session.get(
+            f"{self.base_url}/grade_episode",
+            params={"scenario": scenario},
+            timeout=self.timeout,
+        )
+        resp.raise_for_status()
+        return float(resp.json())
+
+    # Close the session
     def close(self) -> None:
         self.session.close()
 
@@ -117,174 +88,3 @@ class MicroSocGymClient:
 
     def __exit__(self, *args):
         self.close()
-
-
-# ---------------------------------------------------------------------------
-# Pretty-printing helpers
-# ---------------------------------------------------------------------------
-
-def _banner(text: str) -> None:
-    width = 72
-    print("\n" + "=" * width)
-    print(f"  {text}")
-    print("=" * width)
-
-
-def _print_obs(obs: Dict[str, Any]) -> None:
-    reward = obs.get("reward", 0.0)
-    done   = obs.get("done", False)
-
-    inner_obs = obs.get("observation", {})
-    success = inner_obs.get("success", False)
-    info   = inner_obs.get("info", "")
-    logs   = inner_obs.get("logs", "")
-
-    print(f"  reward={reward:+.1f}  done={done}  success={success}")
-    print(f"  info  : {info}")
-    print()
-    if logs:
-        print("  ── logs (tail) ──────────────────────────────────────")
-        for line in logs.splitlines()[-10:]:          # show last 10 lines
-            print(f"  {line}")
-        print()
-
-
-# ---------------------------------------------------------------------------
-# Scenario demos - each returns final total_reward
-# ---------------------------------------------------------------------------
-
-def run_easy(client: MicroSocGymClient) -> float:
-    _banner("SCENARIO 1 / EASY - Noisy Scanner")
-    print("  Expected action: block_ip(...) based on logs")
-
-    obs = client.reset()
-    _print_obs(obs)
-
-    # Parse the logs to find the IP that floods
-    import re
-    from collections import Counter
-    logs = obs.get("observation", {}).get("logs", "")
-    ip_counts = Counter(re.findall(r"^([\d\.]+)", logs, re.MULTILINE))
-    attacker_ip = ip_counts.most_common(1)[0][0] if ip_counts else "10.0.0.1"
-
-    # Optimal agent: one correct action
-    print(f"  → Sending: block_ip({attacker_ip})")
-    obs = client.step(tool="block_ip", ip_address=attacker_ip)
-    _print_obs(obs)
-    
-    total = obs.get("reward", 0.0)
-
-    print(f"  Episode total reward: {total:+.1f}")
-    return total
-
-
-def run_medium(client: MicroSocGymClient) -> float:
-    _banner("SCENARIO 2 / MEDIUM - Stealthy Brute Force")
-    print("  Expected action: block_ip(...) (brute-force IP, not whitelisted admin)")
-
-    obs = client.reset()
-    # Wait a bit extra - medium writes every 4s
-    print("  (waiting 5s for auth.log to populate…)")
-    import time
-    import re
-    from collections import Counter
-    time.sleep(5)
-    # The subsequent step() action will read the newly populated logs.
-    _print_obs(obs)
-
-    # find brute-force attacker by parsing fail counts
-    logs = obs.get("observation", {}).get("logs", "")
-    failures = re.findall(r"Failed password.*from ([\d\.]+)", logs)
-    fail_counts = Counter(failures)
-    attacker_ip = fail_counts.most_common(1)[0][0] if fail_counts else "10.0.0.2"
-
-    print(f"  → Sending: block_ip({attacker_ip})  [correct attacker]")
-    obs = client.step(tool="block_ip", ip_address=attacker_ip)
-    _print_obs(obs)
-
-    total = obs.get("reward", 0.0)
-    print(f"  Episode total reward: {total:+.1f}")
-    return total
-
-
-def run_hard(client: MicroSocGymClient) -> float:
-    _banner("SCENARIO 3 / HARD - Active Webshell C2")
-    print("  Expected actions: kill_process(<pid>)  +  delete_file('/var/www/html/backdoor.php')")
-
-    obs = client.reset()
-    _print_obs(obs)
-
-    # In the hard scenario the logs show the attacker PID via the process list.
-    # For the client demo we ask the /state endpoint; a real RL agent would
-    # parse the log or enumerate /proc to find the hard_attack process.
-    import re
-    logs = obs.get("observation", {}).get("logs", "")
-    pid_hint = None
-
-    # Try to extract a PID from a log line mentioning backdoor.php
-    # Real agent would do this via observation parsing
-    pids_in_logs = re.findall(r"\[(\d+)\]", logs)
-    if pids_in_logs:
-        pid_hint = int(pids_in_logs[0])
-        print(f"  → Extracted PID hint from logs: {pid_hint}")
-
-    total = 0.0
-
-    if pid_hint:
-        print(f"  → Sending: kill_process({pid_hint})")
-        obs1 = client.step(tool="kill_process", pid=pid_hint)
-        _print_obs(obs1)
-        total += obs1.get("reward", 0.0)
-    else:
-        print("  → No PID found in logs - skipping kill_process (hard scenario requires Linux /proc)")
-
-    print("  → Sending: delete_file('/var/www/html/backdoor.php')")
-    obs2 = client.step(tool="delete_file", file_path="/var/www/html/backdoor.php")
-    _print_obs(obs2)
-    total += obs2.get("reward", 0.0)
-
-    print(f"  Episode total reward: {total:+.1f}")
-    return total
-
-
-# ---------------------------------------------------------------------------
-# Entry point
-# ---------------------------------------------------------------------------
-
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Micro-SOC Gym demo client")
-    parser.add_argument(
-        "--url",
-        default="http://localhost:7860",
-        help="Base URL of the running Micro-SOC Gym server (default: http://localhost:7860)",
-    )
-    args = parser.parse_args()
-
-    print(f"\n🔐 Micro-SOC Gym - Demo Client")
-    print(f"   Server: {args.url}\n")
-
-    with MicroSocGymClient(base_url=args.url) as client:
-        # Health check
-        try:
-            h = client.health()
-            print(f"   Health: {h}")
-        except Exception as e:
-            print(f"   ❌ Could not reach server: {e}", file=sys.stderr)
-            sys.exit(1)
-
-        rewards = []
-
-        rewards.append(run_easy(client))
-        rewards.append(run_medium(client))
-        rewards.append(run_hard(client))
-
-        _banner("SUMMARY")
-        labels = ["Easy", "Medium", "Hard"]
-        for label, r in zip(labels, rewards):
-            print(f"  {label:8s}  total reward: {r:+.1f}")
-        print(f"\n  Grand total: {sum(rewards):+.1f}")
-        print()
-
-
-if __name__ == "__main__":
-    main()

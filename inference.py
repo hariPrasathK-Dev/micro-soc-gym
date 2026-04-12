@@ -2,161 +2,175 @@ import os
 import re
 import json
 from typing import List
-
 from openai import OpenAI
 
 from models import MicroSocGymAction
 from client import MicroSocGymClient
+from server.constants import MAX_STEPS, SCENARIOS
 
-# ---------------------------------------------------------------------------
-# Required Environment Configuration via os.getenv
-# ---------------------------------------------------------------------------
+# Environment variables
 API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
 HF_TOKEN = os.getenv("HF_TOKEN")
 
-BENCHMARK = os.getenv("MY_ENV_V4_BENCHMARK", "micro_soc_gym")
-MAX_STEPS = 8
-TEMPERATURE = 0.7
+TEMPERATURE = 0.5 # Set to 0.5 to make sure model is balanced between creativity and determinism
 
-
+# Utility function to extract tool JSON from model response
 def extract_json(text: str) -> str:
-    """Extract JSON object from LLM output, handling markdown blocks."""
     import json
     import re
 
-    # Step 1: Try markdown code block first (```json ... ``` or ``` ... ```)
-    match = re.search(r'```(?:json)?\s*(\{[\s\S]*?\})\s*```', text)
+    # First try to extract JSON from markdown code blocks
+    match = re.search(r"```(?:json)?\s*(\{[\s\S]*?\})\s*```", text)
     if match:
         candidate = match.group(1)
         try:
             json.loads(candidate)
             return candidate
         except json.JSONDecodeError:
-            pass  # fall through to brace counting
-
-    # Step 2: Brace-counting to find all valid top-level JSON objects
+            pass
+    
+    # If markdown fence based etraction fails, extract by searching for JSON-like substrings and validate them
     candidates = []
     for i, ch in enumerate(text):
-        if ch == '{':
+        if ch == "{":
             depth = 0
             for j, c in enumerate(text[i:], start=i):
-                if c == '{':
+                if c == "{":
                     depth += 1
-                elif c == '}':
+                elif c == "}":
                     depth -= 1
-                
+
                 if depth == 0:
-                    candidate = text[i:j+1]
+                    candidate = text[i : j + 1]
                     try:
                         json.loads(candidate)
                         candidates.append(candidate)
                     except json.JSONDecodeError:
                         pass
-                    break  # move to next starting {
+                    break
 
     if candidates:
-        # Return the largest valid JSON object found (most likely the intended one)
         return max(candidates, key=len)
 
     return "{}"
 
 
 def main():
-    # Instantiate the OpenAI client
-    client = OpenAI(api_key=HF_TOKEN, base_url=API_BASE_URL)
-    
-    # We must connect to the live Docker Environment via HTTP
-    env_client = MicroSocGymClient(base_url="http://localhost:7860")
+    client = OpenAI(api_key=HF_TOKEN, base_url=API_BASE_URL) # Connect to model API
 
-    # The environment has exactly 3 specific scenarios.
-    for scenario_idx in range(3):
-        obs = env_client.reset()
-        
-        inner_info = obs.get("observation", {}).get("info", "")
-        
-        # Extract scenario from the initial info string
-        task_name = "easy"
-        if "Scenario: medium" in inner_info:
-            task_name = "medium"
-        elif "Scenario: hard" in inner_info:
-            task_name = "hard"
+    env_client = MicroSocGymClient(base_url="http://localhost:7860") # Connect to local environment server (docker container)
 
-        # Emit [START] event
-        print(f"[START] task={task_name} env={BENCHMARK} model={MODEL_NAME}", flush=True)
+    # Runs the full episode loop for each scenario
+    for scenario_idx in range(len(SCENARIOS)):
+        obs = env_client.reset() # Resets environment to start a new episode
+
+        scenario_name = SCENARIOS[scenario_idx]
+        benchmark = "micro-soc-gym" # Hardcoded benchmark name as only one benchmark written for now
+
+        # Emit [START] log with scenario and model info
+        print(f"[START] task={scenario_name} env={benchmark} model={MODEL_NAME}", flush=True)
 
         step_idx = 0
         rewards: List[float] = []
+        action_history: List[str] = []
         done = obs.get("done", False)
         success = obs.get("observation", {}).get("success", False)
-        
+
+        # Get the initial alert info to give context to the agent and append to action_history
+        initial_info = obs.get("observation", {}).get("info", "")
+        if initial_info:
+            action_history.append(f"Step 0: {initial_info}")
+
+        # Exits loop when episode is done / expires / errors out
         while not done and step_idx < MAX_STEPS:
             step_idx += 1
-            
-            logs_content = obs.get("observation", {}).get("logs", "")
 
+            # Main system prompt with agent context, tool descriptions and instructions
             system_prompt = (
-                "You are an expert Security Operations Center (SOC) analyst. "
-                "Your job is to investigate server logs and take exactly ONE remediation action per turn.\n\n"
-                "Available tools and their descriptions:\n\n"
+                "You are an expert Security Operations Center (SOC) analyst."
+                "Your job is to investigate web server logs and take exactly ONE action per turn until the threat is neutralised.\n\n"
+
+                "BEFORE ACTING - CHECK YOUR HISTORY FIRST:\n"
+                "The action history contains the full output and feedback of all previous actions including logs."
+                "If logs have already been read, do NOT read them again - extract the evidence you need directly from action history. "
+                "Only read a log if it has not been read yet in this episode.\n\n"
+
+                "Available tools:\n\n"
+                "  read_access_log()\n"
+                "    - Reads the web server access log.\n"
+                "    - Use ONCE to investigate potential web-based attacks.\n\n"
+                "  read_auth_log()\n"
+                "    - Reads the system authentication log.\n"
+                "    - Use ONCE to investigate potential brute-force or unauthorized login attempts.\n\n"
                 "  block_ip(ip_address: str)\n"
                 "    - Adds an IP to the firewall blocklist.\n"
-                "    - Use when you see a single IP causing suspicious repeated traffic.\n"
-                "    - Requires field: \"ip_address\" (string)\n\n"
+                "    - Use when you see a single IP causing repeated suspicious traffic.\n"
+                '    - Requires field: "ip_address" (string)\n\n'
                 "  kill_process(pid: int)\n"
                 "    - Sends SIGKILL to a running process by its PID.\n"
-                "    - Use when a process is actively running malicious commands or a webshell.\n"
-                "    - The PID usually appears as a bracketed integer in the log user-agent field, "
-                "e.g. \"AppleWebKit/537.36 [1234]\" means PID=1234. Do NOT guess random PIDs.\n"
-                "    - Requires field: \"pid\" (integer)\n\n"
+                "    - Use when a process is actively running malicious commands from within the server.\n"
+                '    - The PID appears as a bracketed integer in the user-agent field, e.g. "AppleWebKit/537.36 [1234]" means PID=1234.\n'
+                "    - Extract the PID from the logs. Do NOT guess.\n"
+                '    - Requires field: "pid" (integer)\n\n'
                 "  delete_file(file_path: str)\n"
                 "    - Permanently removes a file from the filesystem.\n"
                 "    - Use when a malicious file has been planted on the server.\n"
-                "    - Always use the FULL absolute filesystem path. (Hint: access logs often show paths relative to the web server's document root. You must infer the absolute path based on standard Linux web server configurations).\n"
-                "    - Requires field: \"file_path\" (string)\n\n"
-                "Take one action per turn and continue until the threat is neutralised.\n\n"
+                "    - Always use the FULL absolute path e.g. /var/www/html/shell.php.\n"
+                '    - Requires field: "file_path" (string)\n\n'
+
                 "Output ONLY a single raw JSON object. No markdown fences, no explanation."
             )
 
+            # Calculates cumulative reward and gets action_history_str for prompt
+            action_history_str = "\n".join(action_history) if action_history else "None"
+            current_total_reward = sum(rewards)
+            
+            # Passes action_history, cumulative reward and available tools in the prompt for the agent to decide next action
             prompt = (
-                f"Scenario: {task_name}\n\n"
-                f"Last action feedback: {inner_info}\n\n"
-                f"Current server logs:\n{logs_content}\n\n"
+                f"Action History:\n{action_history_str}\n\n"
+                f"Total Reward So Far: {current_total_reward:.2f}\n\n"
                 f"Choose the single best action. Output ONLY valid JSON, one of:\n"
+                f'  {{"tool": "read_access_log"}}\n'
+                f'  {{"tool": "read_auth_log"}}\n'
                 f'  {{"tool": "block_ip", "ip_address": "<ip>"}}\n'
-                f'  {{"tool": "delete_file", "file_path": "<absolute_path>"}}\n'
                 f'  {{"tool": "kill_process", "pid": <integer>}}\n'
+                f'  {{"tool": "delete_file", "file_path": "<absolute_path>"}}\n'
             )
 
             action_str = ""
             error_msg = "null"
             reward = 0.00
-            
+
             try:
+                # Sends prompt to model and fetches response
                 response = client.chat.completions.create(
                     model=MODEL_NAME,
                     messages=[
                         {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": prompt}
+                        {"role": "user", "content": prompt},
                     ],
                     temperature=TEMPERATURE,
                 )
                 
+                # Gets respnse content and extracts actin from JSON
                 raw_content = response.choices[0].message.content or ""
                 action_str = extract_json(raw_content)
-                
-                # Parse to ensure it conforms to our Environment's Pydantic schema
                 action_dict = json.loads(action_str)
                 action = MicroSocGymAction(**action_dict)
-                
-                # Step the environment via the proxy client payload
-                action_kwargs = {"tool": action.tool}
-                if action.ip_address: action_kwargs["ip_address"] = action.ip_address
-                if action.file_path: action_kwargs["file_path"] = action.file_path
-                if action.pid is not None: action_kwargs["pid"] = action.pid
 
-                obs = env_client.step(**action_kwargs)
-                
+                # Extracts action param values
+                action_kwargs = {"tool": action.tool}
+                if action.ip_address:
+                    action_kwargs["ip_address"] = action.ip_address
+                if action.file_path:
+                    action_kwargs["file_path"] = action.file_path
+                if action.pid is not None:
+                    action_kwargs["pid"] = action.pid
+
+                obs = env_client.step(**action_kwargs) # Calls the step function to run the action in the environment
+
+                # Gets results of the step function
                 reward = obs.get("reward", 0.0)
                 rewards.append(reward)
                 done = obs.get("done", False)
@@ -164,41 +178,47 @@ def main():
                 inner_info = obs.get("observation", {}).get("info", "")
 
             except Exception as e:
-                # Catch validation layers (e.g., Pydantic parsing errors)
-                error_msg = str(e).replace('\n', ' ')
+                # If an error occurs, we end the episode cleanly and log the msg
+                error_msg = str(e).replace("\n", " ")
                 action_str = action_str or "{}"
-                reward = 0.0
+                reward = -1.0
                 rewards.append(reward)
-                done = False
+                done = True
 
-            # Format action string cleanly for single-line STDOUT
-            action_log = action_str.replace('\n', '').replace('\r', '') if action_str else "{}"
-            
-            # Emit [STEP] event
+            action_log = (action_str.replace("\n", "").replace("\r", "") if action_str else "{}")
+
+            # Appends action and its result to action_history for future context
+            is_action_read_log = '"read_' in action_log
+
+            # If it is a remediation action, then info is "Feedback", else its the logs itself, so "Information" is used 
+            info_prefix = "Information:\n" if is_action_read_log else "Feedback: " 
+
+            action_history.append(
+                f"Step {step_idx}: Action: {action_log} -> Reward: {reward:.2f} | {info_prefix}{inner_info}"
+            )
+
+            # Emit [STEP] log
             print(
                 f"[STEP] step={step_idx} "
                 f"action={action_log} "
                 f"reward={reward:.2f} "
                 f"done={str(done).lower()} "
-                f"error={error_msg}", 
-                flush=True
+                f"error={error_msg}",
+                flush=True,
             )
 
-        # End of Episode
-        raw_score = sum(rewards)
+        # Creates the rewards string showing all rewards obtained in the episode
         rewards_str = ",".join(f"{r:.2f}" for r in rewards) if rewards else "0.00"
 
-        # Normalize score to be strictly between 0 and 1 (exclusive).
-        MAX_EPISODE_REWARD = 1.0
-        score = max(0.001, min(0.999, raw_score / MAX_EPISODE_REWARD))
+        score = env_client.grade_episode(scenario_name) # Grades the episode and fetches the final score
 
-        # Emit [END] event
+        # Emit [END] log
         print(
             f"[END] success={str(success).lower()} "
             f"steps={step_idx} "
-            f"score={score:.4f} "
+            f"score={score:.2f} "
             f"rewards={rewards_str}",
-            flush=True
+            flush=True,
         )
 
 

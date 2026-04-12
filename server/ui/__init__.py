@@ -4,6 +4,13 @@
 # This source code is licensed under the BSD-style license found in the
 # LICENSE file in the root directory of this source tree.
 
-from server.micro_soc_gym_environment import MicroSocGymEnvironment
+"""
+server.ui — Gradio UI package for the Micro-SOC Gym.
 
-__all__ = ["MicroSocGymEnvironment"]
+Public surface:
+    build_ui(env: MicroSocGymEnvironment) -> gr.Blocks
+"""
+
+from server.ui.layout import build_ui
+
+__all__ = ["build_ui"]
