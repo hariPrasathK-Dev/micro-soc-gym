@@ -448,9 +448,9 @@ class MicroSocGymEnvironment(Environment):
                 
                 # Episode is only done if backdoor is also deleted and process is killed before this
                 process_alive = check_hard_attack_process()
-                done = not os.path.exists(backdoor_path) and not process_alive
+                done = not backdoor_exists and not process_alive
 
-                hint = self._get_hard_scenario_hint(os.path.exists(backdoor_path), process_alive, True)
+                hint = self._get_hard_scenario_hint(backdoor_exists, process_alive, True)
                 return (
                     CORRECT_ACTION_REWARD,
                     done,
@@ -484,9 +484,9 @@ class MicroSocGymEnvironment(Environment):
 
                     # Episode is only done if backdoor is also deleted and IP is blocked before this
                     ip_blocked = is_ip_blocked(self.attacker_ip)
-                    done = not os.path.exists(backdoor_path) and ip_blocked
+                    done = not backdoor_exists and ip_blocked
                     
-                    hint = self._get_hard_scenario_hint(os.path.exists(backdoor_path), False, ip_blocked)
+                    hint = self._get_hard_scenario_hint(backdoor_exists, False, ip_blocked)
                     return (
                         CORRECT_ACTION_REWARD,
                         done,

