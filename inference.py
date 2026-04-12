@@ -72,11 +72,12 @@ def main():
         step_idx = 0
         rewards: List[float] = []
         action_history: List[str] = []
+
         done = obs.get("done", False)
-        success = obs.get("observation", {}).get("success", False)
+        success = obs.get("success", False)
 
         # Get the initial alert info to give context to the agent and append to action_history
-        initial_info = obs.get("observation", {}).get("info", "")
+        initial_info = obs.get("info", "")
         if initial_info:
             action_history.append(f"Step 0: {initial_info}")
 
@@ -170,18 +171,18 @@ def main():
 
                 # Gets results of the step function
                 reward = obs.get("reward", 0.0)
-                rewards.append(reward)
                 done = obs.get("done", False)
-                success = obs.get("observation", {}).get("success", False)
-                inner_info = obs.get("observation", {}).get("info", "")
+                success = obs.get("success", False)
+                inner_info = obs.get("info", "")
 
             except Exception as e:
                 # If an error occurs, we end the episode cleanly and log the msg
                 error_msg = str(e).replace("\n", " ")
                 action_str = action_str or "{}"
                 reward = -1.0
-                rewards.append(reward)
                 done = True
+
+            rewards.append(reward)
 
             action_log = (action_str.replace("\n", "").replace("\r", "") if action_str else "{}")
 
@@ -208,7 +209,9 @@ def main():
         # Creates the rewards string showing all rewards obtained in the episode
         rewards_str = ",".join(f"{r:.2f}" for r in rewards) if rewards else "0.00"
 
-        score = env_client.grade_episode(scenario_name) # Grades the episode and fetches the final score
+        # Grades the episode and fetches the final score
+        grade = env_client.grade_episode()
+        score = grade["score"]
 
         # Emit [END] log
         print(

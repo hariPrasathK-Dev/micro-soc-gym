@@ -45,15 +45,13 @@ class MicroSocGymClient:
         file_path: Optional[str] = None,
         pid: Optional[int] = None,
     ) -> Dict[str, Any]:
-        action_payload: Dict[str, Any] = {"tool": tool}
+        payload: Dict[str, Any] = {"tool": tool}
         if ip_address is not None:
-            action_payload["ip_address"] = ip_address
+            payload["ip_address"] = ip_address
         if file_path is not None:
-            action_payload["file_path"] = file_path
+            payload["file_path"] = file_path
         if pid is not None:
-            action_payload["pid"] = pid
-
-        payload = {"action": action_payload}
+            payload["pid"] = pid
 
         resp = self.session.post(
             f"{self.base_url}/step",
@@ -69,15 +67,14 @@ class MicroSocGymClient:
         resp.raise_for_status()
         return resp.json()
 
-    # Grade the completed episode based on scenario, returns a score between (0, 1)
-    def grade_episode(self, scenario: str) -> float:
+    # Grade the completed episode and returns the state with score between (0, 1)
+    def grade_episode(self) -> Dict[str, Any]:
         resp = self.session.get(
             f"{self.base_url}/grade_episode",
-            params={"scenario": scenario},
             timeout=self.timeout,
         )
         resp.raise_for_status()
-        return float(resp.json())
+        return resp.json()
 
     # Close the session
     def close(self) -> None:
