@@ -8,19 +8,14 @@ from models import MicroSocGymAction
 from client import MicroSocGymClient
 from server.constants import MAX_STEPS, SCENARIOS
 
-# Environment variables
 API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
-MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
-HF_TOKEN = os.getenv("HF_TOKEN")
+MODEL_NAME   = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
+HF_TOKEN     = os.getenv("HF_TOKEN")
 
-TEMPERATURE = 0.5 # Set to 0.5 to make sure model is balanced between creativity and determinism
+TEMPERATURE  = 0.5
 
-# Utility function to extract tool JSON from model response
+
 def extract_json(text: str) -> str:
-    import json
-    import re
-
-    # First try to extract JSON from markdown code blocks
     match = re.search(r"```(?:json)?\s*(\{[\s\S]*?\})\s*```", text)
     if match:
         candidate = match.group(1)
@@ -29,8 +24,7 @@ def extract_json(text: str) -> str:
             return candidate
         except json.JSONDecodeError:
             pass
-    
-    # If markdown fence based etraction fails, extract by searching for JSON-like substrings and validate them
+
     candidates = []
     for i, ch in enumerate(text):
         if ch == "{":
@@ -40,9 +34,8 @@ def extract_json(text: str) -> str:
                     depth += 1
                 elif c == "}":
                     depth -= 1
-
                 if depth == 0:
-                    candidate = text[i : j + 1]
+                    candidate = text[i:j + 1]
                     try:
                         json.loads(candidate)
                         candidates.append(candidate)
@@ -57,36 +50,31 @@ def extract_json(text: str) -> str:
 
 
 def main():
-    client = OpenAI(api_key=HF_TOKEN, base_url=API_BASE_URL) # Connect to model API
+    client     = OpenAI(api_key=HF_TOKEN, base_url=API_BASE_URL)
+    env_client = MicroSocGymClient(base_url="http://localhost:7860")
 
-    env_client = MicroSocGymClient(base_url="http://localhost:7860") # Connect to local environment server (docker container)
-
-    # Runs the full episode loop for each scenario
     for scenario_idx in range(len(SCENARIOS)):
-        obs = env_client.reset() # Resets environment to start a new episode
-
+        obs           = env_client.reset()
         scenario_name = SCENARIOS[scenario_idx]
-        benchmark = "micro-soc-gym" # Hardcoded benchmark name as only one benchmark written for now
+        benchmark     = "micro-soc-gym"
 
-        # Emit [START] log with scenario and model info
         print(f"[START] task={scenario_name} env={benchmark} model={MODEL_NAME}", flush=True)
 
-        step_idx = 0
+        step_idx       = 0
         rewards: List[float] = []
         action_history: List[str] = []
-        done = obs.get("done", False)
-        success = obs.get("observation", {}).get("success", False)
 
-        # Get the initial alert info to give context to the agent and append to action_history
-        initial_info = obs.get("observation", {}).get("info", "")
+        # FIX 1: obs fields are flat — no "observation" wrapper
+        done    = obs.get("done", False)
+        success = obs.get("success", False)
+
+        initial_info = obs.get("info", "")
         if initial_info:
             action_history.append(f"Step 0: {initial_info}")
 
-        # Exits loop when episode is done / expires / errors out
         while not done and step_idx < MAX_STEPS:
             step_idx += 1
 
-            # Main system prompt with agent context, tool descriptions and instructions
             system_prompt = (
                 "You are an expert Security Operations Center (SOC) analyst."
                 "Your job is to investigate web server logs and take exactly ONE action per turn until the threat is neutralised.\n\n"
@@ -122,11 +110,9 @@ def main():
                 "Output ONLY a single raw JSON object. No markdown fences, no explanation."
             )
 
-            # Calculates cumulative reward and gets action_history_str for prompt
-            action_history_str = "\n".join(action_history) if action_history else "None"
+            action_history_str   = "\n".join(action_history) if action_history else "None"
             current_total_reward = sum(rewards)
-            
-            # Passes action_history, cumulative reward and available tools in the prompt for the agent to decide next action
+
             prompt = (
                 f"Action History:\n{action_history_str}\n\n"
                 f"Total Reward So Far: {current_total_reward:.2f}\n\n"
@@ -138,28 +124,27 @@ def main():
                 f'  {{"tool": "delete_file", "file_path": "<absolute_path>"}}\n'
             )
 
+            # FIX 3: initialise inner_info before try so it's always in scope
             action_str = ""
-            error_msg = "null"
-            reward = 0.00
+            error_msg  = "null"
+            reward     = 0.00
+            inner_info = ""
 
             try:
-                # Sends prompt to model and fetches response
                 response = client.chat.completions.create(
                     model=MODEL_NAME,
                     messages=[
                         {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": prompt},
+                        {"role": "user",   "content": prompt},
                     ],
                     temperature=TEMPERATURE,
                 )
-                
-                # Gets respnse content and extracts actin from JSON
-                raw_content = response.choices[0].message.content or ""
-                action_str = extract_json(raw_content)
-                action_dict = json.loads(action_str)
-                action = MicroSocGymAction(**action_dict)
 
-                # Extracts action param values
+                raw_content = response.choices[0].message.content or ""
+                action_str  = extract_json(raw_content)
+                action_dict = json.loads(action_str)
+                action      = MicroSocGymAction(**action_dict)
+
                 action_kwargs = {"tool": action.tool}
                 if action.ip_address:
                     action_kwargs["ip_address"] = action.ip_address
@@ -168,36 +153,30 @@ def main():
                 if action.pid is not None:
                     action_kwargs["pid"] = action.pid
 
-                obs = env_client.step(**action_kwargs) # Calls the step function to run the action in the environment
+                obs = env_client.step(**action_kwargs)
 
-                # Gets results of the step function
-                reward = obs.get("reward", 0.0)
-                rewards.append(reward)
-                done = obs.get("done", False)
-                success = obs.get("observation", {}).get("success", False)
-                inner_info = obs.get("observation", {}).get("info", "")
+                # FIX 1: flat field access — no "observation" nesting
+                reward     = obs.get("reward", 0.0)
+                done       = obs.get("done", False)
+                success    = obs.get("success", False)
+                inner_info = obs.get("info", "")
 
             except Exception as e:
-                # If an error occurs, we end the episode cleanly and log the msg
-                error_msg = str(e).replace("\n", " ")
+                error_msg  = str(e).replace("\n", " ")
                 action_str = action_str or "{}"
-                reward = -1.0
-                rewards.append(reward)
-                done = True
+                reward     = -1.0
+                done       = True
 
-            action_log = (action_str.replace("\n", "").replace("\r", "") if action_str else "{}")
+            rewards.append(reward)
 
-            # Appends action and its result to action_history for future context
+            action_log      = action_str.replace("\n", "").replace("\r", "") if action_str else "{}"
             is_action_read_log = '"read_' in action_log
-
-            # If it is a remediation action, then info is "Feedback", else its the logs itself, so "Information" is used 
-            info_prefix = "Information:\n" if is_action_read_log else "Feedback: " 
+            info_prefix     = "Information:\n" if is_action_read_log else "Feedback: "
 
             action_history.append(
                 f"Step {step_idx}: Action: {action_log} -> Reward: {reward:.2f} | {info_prefix}{inner_info}"
             )
 
-            # Emit [STEP] log
             print(
                 f"[STEP] step={step_idx} "
                 f"action={action_log} "
@@ -207,12 +186,12 @@ def main():
                 flush=True,
             )
 
-        # Creates the rewards string showing all rewards obtained in the episode
         rewards_str = ",".join(f"{r:.2f}" for r in rewards) if rewards else "0.00"
 
-        score = env_client.grade_episode(scenario_name) # Grades the episode and fetches the final score
+        # FIX 2: grade_episode takes no args and returns a dict
+        grade = env_client.grade_episode()
+        score = grade["score"]
 
-        # Emit [END] log
         print(
             f"[END] success={str(success).lower()} "
             f"steps={step_idx} "

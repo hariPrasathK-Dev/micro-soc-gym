@@ -15,29 +15,24 @@ except ImportError:
     raise ImportError("requests is required: pip install requests")
 
 
-# Client for interacting with the Micro SOC Gym REST API
 class MicroSocGymClient:
 
-    # Initialse the client session with base url (docker container)
     def __init__(self, base_url: str = "http://localhost:7860", timeout: int = 30):
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self.session = requests.Session()
         self.session.headers.update({"Content-Type": "application/json"})
 
-    # Health endpint to check API server status
     def health(self) -> Dict[str, Any]:
         resp = self.session.get(f"{self.base_url}/health", timeout=self.timeout)
         resp.raise_for_status()
         return resp.json()
-    
-    # Reset the environment for a new episode
+
     def reset(self) -> Dict[str, Any]:
         resp = self.session.post(f"{self.base_url}/reset", timeout=self.timeout)
         resp.raise_for_status()
         return resp.json()
 
-    # Steps through process executing a tool action and returns its result
     def step(
         self,
         tool: str,
@@ -45,15 +40,15 @@ class MicroSocGymClient:
         file_path: Optional[str] = None,
         pid: Optional[int] = None,
     ) -> Dict[str, Any]:
-        action_payload: Dict[str, Any] = {"tool": tool}
+        # Payload is the action fields directly — FastAPI deserialises
+        # the body straight into MicroSocGymAction, no wrapper key needed.
+        payload: Dict[str, Any] = {"tool": tool}
         if ip_address is not None:
-            action_payload["ip_address"] = ip_address
+            payload["ip_address"] = ip_address
         if file_path is not None:
-            action_payload["file_path"] = file_path
+            payload["file_path"] = file_path
         if pid is not None:
-            action_payload["pid"] = pid
-
-        payload = {"action": action_payload}
+            payload["pid"] = pid
 
         resp = self.session.post(
             f"{self.base_url}/step",
@@ -63,23 +58,22 @@ class MicroSocGymClient:
         resp.raise_for_status()
         return resp.json()
 
-    # Retrieve the current state of the environment
     def state(self) -> Dict[str, Any]:
         resp = self.session.get(f"{self.base_url}/state", timeout=self.timeout)
         resp.raise_for_status()
         return resp.json()
 
-    # Grade the completed episode based on scenario, returns a score between (0, 1)
-    def grade_episode(self, scenario: str) -> float:
+    def grade_episode(self) -> Dict[str, Any]:
+        # No parameters — the server reads scenario from its own state.
+        # Returns the full grading dict: episode_id, scenario, score,
+        # total_reward, steps_taken, threat_neutralised.
         resp = self.session.get(
             f"{self.base_url}/grade_episode",
-            params={"scenario": scenario},
             timeout=self.timeout,
         )
         resp.raise_for_status()
-        return float(resp.json())
+        return resp.json()
 
-    # Close the session
     def close(self) -> None:
         self.session.close()
 
