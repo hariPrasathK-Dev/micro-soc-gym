@@ -325,6 +325,12 @@ CSS = """
     border-radius: 3px;
     font-size: 12px;
 }
+
+/* Title styling */
+@media (prefers-color-scheme: light) {
+    .soc-title { color: #000000 !important; }
+}
+[data-theme="light"] .soc-title { color: #000000 !important; }
 """
 
 HEAD = """
@@ -349,7 +355,7 @@ def build_ui(env: MicroSocGymEnvironment) -> gr.Blocks:
         gr.HTML("""
         <div style="padding:28px 0 4px;border-bottom:1px solid #0f172a;margin-bottom:20px;">
           <div style="display:flex;align-items:baseline;gap:14px;">
-            <span style="font-size:22px;font-weight:700;color:#e2e8f0;letter-spacing:-0.5px;">
+            <span class="soc-title" style="font-size:24px;font-weight:700;color:#e2e8f0;letter-spacing:-0.5px;">
               Micro SOC Gym
             </span>
             <span style="font-size:13px;color:#ffffff;font-family:monospace;">
