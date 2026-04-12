@@ -29,7 +29,7 @@ from server.ui.components import (
     stat_card,
 )
 
-# Module-level episode state
+# ── Module-level episode state ────────────────────────────────────────────────
 # Each item: (step_number, per_step_reward, tool_name)
 _step_rewards: List[Tuple[int, float, str]] = []
 # Each item: dict with step/tool/param/reward/result/success
@@ -87,7 +87,8 @@ def _hard_progress_state(env: MicroSocGymEnvironment):
     return ip_blocked, file_deleted, proc_killed
 
 
-# Public handlers
+# ── Public handlers ───────────────────────────────────────────────────────────
+
 def handle_reset(env: MicroSocGymEnvironment):
     """Called when the user clicks Reset. Returns all UI output values."""
     _reset_state()

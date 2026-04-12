@@ -31,7 +31,7 @@ from server.ui.components import (
 from server.ui.handlers import handle_reset, handle_step
 
 
-# Stylesheet
+# ── Stylesheet ────────────────────────────────────────────────────────────────
 
 CSS = """
 /* Base */
@@ -160,7 +160,7 @@ def build_ui(env: MicroSocGymEnvironment) -> gr.Blocks:
 
     with gr.Blocks(css=CSS, head=HEAD, title="Micro-SOC Gym") as demo:
 
-        # Title bar
+        # ── Title bar ──────────────────────────────────────────────────────
         gr.HTML("""
         <div style="padding:28px 0 4px;border-bottom:1px solid #0f172a;margin-bottom:20px;">
           <div style="display:flex;align-items:baseline;gap:14px;">
@@ -179,7 +179,7 @@ def build_ui(env: MicroSocGymEnvironment) -> gr.Blocks:
         </div>
         """)
 
-        # Reset + scenario header
+        # ── Reset + scenario header ────────────────────────────────────────
         with gr.Row():
             with gr.Column(scale=4):
                 scenario_header_html = gr.HTML(scenario_header(""))
@@ -196,12 +196,12 @@ def build_ui(env: MicroSocGymEnvironment) -> gr.Blocks:
         # Episode outcome
         outcome_html = gr.HTML(outcome_banner(False, False, 0.0, 0))
 
-        # Stats row
+        # ── Stats row ─────────────────────────────────────────────────────
         with gr.Row():
             steps_stat  = gr.HTML(stat_card("STEPS", "— / 8"))
             reward_stat = gr.HTML(stat_card("TOTAL REWARD", "—"))
 
-        # Main two-column layout
+        # ── Main two-column layout ─────────────────────────────────────────
         with gr.Row(equal_height=False):
 
             # Left column — action controls + feedback
@@ -296,14 +296,14 @@ def build_ui(env: MicroSocGymEnvironment) -> gr.Blocks:
                 )
                 history_html = gr.HTML(action_history_table([]))
 
-        # Reference tables (collapsed by default)
+        # ── Reference tables (collapsed by default) ───────────────────────
         with gr.Accordion("Scenario reference", open=False):
             gr.HTML(scenario_reference_html())
 
         with gr.Accordion("Reward reference", open=False):
             gr.HTML(reward_reference_html())
 
-        # Shared output list
+        # ── Shared output list ────────────────────────────────────────────
         # Order must match the return tuples in handlers.py exactly.
         # ALL five tool buttons are included so handlers can disable every
         # one of them when done=True, preventing the "9 / 8" overshoot.
@@ -323,7 +323,7 @@ def build_ui(env: MicroSocGymEnvironment) -> gr.Blocks:
             btn_kill_process,       # 12 — remediation
         ]
 
-        # Wiring
+        # ── Wiring ────────────────────────────────────────────────────────
 
         # Reset
         reset_btn.click(fn=_reset, inputs=[], outputs=_outputs)
